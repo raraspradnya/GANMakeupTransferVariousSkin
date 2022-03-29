@@ -5,7 +5,7 @@ import argparse
 
 from face_detection import select_face, select_all_faces
 from face_swap import face_swap
-from parsing import get_face
+from face_parsing import get_face
 
 
 if __name__ == '__main__':
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
  
     test_set = []
-    for (path, dirnames, filenames) in os.walk("D:/# Raras/src/data/edited/10"):
+    for (path, dirnames, filenames) in os.walk("D:/# Raras/src/data/edited/10n"):
         test_set.extend(os.path.join(path, name) for name in filenames)
 
     test_set1 = []
@@ -36,10 +36,10 @@ if __name__ == '__main__':
         src_img = cv2.imread(makeup[i])
         dst_img = cv2.imread(non_makeup[i])
 
-        src_img = get_face(src_img)
+        src_img_seg = get_face(src_img)
         try:
         # Select src face
-            src_points, src_shape, src_face = select_face(src_img)
+            src_points, src_shape, src_face = select_face(src_img_seg)
             # Select dst face
             dst_faceBoxes = select_all_faces(dst_img)
 
@@ -65,7 +65,7 @@ if __name__ == '__main__':
                 images = [src_img, dst_img, output]
                 new_im = cv2.hconcat(images)
 
-                img_path = "D:/# Raras/src/data/groundtruth/coba/" + str(i) + ".jpg"
+                img_path = "D:/# Raras/src/data/groundtruth/coba/" + str(makeup[i][30:])
                 cv2.imwrite(img_path, new_im)
         except:
             print("gak bisa")

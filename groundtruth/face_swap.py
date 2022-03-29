@@ -4,11 +4,6 @@ import cv2
 import numpy as np
 import scipy.spatial as spatial
 import logging
-import matplotlib.pyplot as plt
-from skimage.exposure import match_histograms
-from parsing import get_lips
-from skimage import exposure
-
 
 ## 3D Transform
 def bilinear_interpolate(img, coords):
@@ -259,9 +254,6 @@ def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, ar
         mask_src = np.mean(warped_src_face, axis=2) > 0
         mask = np.asarray(mask * mask_src, dtype=np.uint8)
 
-    ## Shrink the mask
-    # kernel = np.ones((10, 10), np.uint8)
-    # mask = cv2.erode(mask, kernel, iterations=1)
     ##Poisson Blending
     r = cv2.boundingRect(mask)
     center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
@@ -272,25 +264,4 @@ def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, ar
     dst_img_cp = dst_img.copy()
     dst_img_cp[y:y + h, x:x + w] = output
 
-    # histogram matching for lips area
-    # lips_src, mask  = get_lips(dst_img_cp)
-    # lips_ref, mask_ = get_lips(warped_src_face)
-    # lips_matched = histogram_match(lips_src, lips_ref)
-    
-    # lips_result = np.zeros_like(dst_img_cp)
-    # # lips_result[mask == 0] = 0
-    # dst_img_cp[mask != 0] = lips_matched[mask != 0]
-    # cv2.imshow("lips_src", lips_src)
-    # cv2.imshow("lips_ref", lips_ref)
-    # cv2.imshow("lips_matched", lips_matched)
-    # cv2.imshow("lips_result", lips_result)
-    # cv2.waitKey(0)
-
     return dst_img_cp
-
-def histogram_match(seg1, seg2):
-    image = seg1
-    reference = seg2
-    matched = match_histograms(image, reference, multichannel=True)
-
-    return matched

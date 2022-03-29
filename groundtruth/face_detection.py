@@ -1,6 +1,8 @@
 import cv2
 import dlib
 import numpy as np
+PREDICTOR_PATH = '../model/shape_predictor_68_face_landmarks.dat'
+predictor = dlib.shape_predictor(PREDICTOR_PATH)
 
 ## Face detection
 def face_detection(img,upsample_times=1):
@@ -12,8 +14,6 @@ def face_detection(img,upsample_times=1):
 
     return faces
 
-PREDICTOR_PATH = '../model/shape_predictor_68_face_landmarks.dat'
-predictor = dlib.shape_predictor(PREDICTOR_PATH)
 ## Face and points detection
 def face_points_detection(img, bbox:dlib.rectangle):
     # Get the landmarks/parts for the face in box d.

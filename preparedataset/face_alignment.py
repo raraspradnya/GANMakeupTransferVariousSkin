@@ -3,7 +3,6 @@ import cv2
 import math
 from cv2 import mean
 import matplotlib.pyplot as plt
-import pandas as pd
 import dlib
 import numpy as np
 import os
@@ -278,7 +277,7 @@ def estimate_pose(img_path):
 
 # test_set = ["D:/# Raras/src/data/coba\\1003.jpg"]
 test_set = []
-for (path, dirnames, filenames) in os.walk('D:/# Raras/src/data/edited/combine'):
+for (path, dirnames, filenames) in os.walk('D:/# Raras/src/makeup_dataset/all/images/non-makeup'):
     test_set.extend(os.path.join(path, name) for name in filenames)
 
 # print(test_set)
@@ -287,7 +286,7 @@ y_A = []
 count = 0
 for instance in test_set:
     if (os.path.exists(instance.strip())):
-        img_name= instance[34:]
+        img_name= instance[51:]
         print(img_name)
         pose = estimate_pose(instance)
         print(pose)
@@ -304,21 +303,30 @@ for instance in test_set:
                         print(img_name + " is error")
 
                     img = expand2square(img[:, :, ::-1], (0,0,0))
-                    plt.imshow(img)
-                    # plt.show()
-                    img_path = "D:/# Raras/src/data/edited/10n/" + str(count) +".jpg"
-                    img.save(img_path)
                     
+                    # plt.show()
+                    img_path = "D:/# Raras/src/makeup_dataset/final/no_makeup/" + str(img_name)
+                    # plt.imshow(img)
+                    # plt.show()
+                    img.save(img_path)
+                    seg_path = 'D:/# Raras/src/makeup_dataset/all/segs/non-makeup/' + str(img_name)
+                    seg = cv2.imread(seg_path)
+                    seg_gray = cv2.cvtColor(seg, cv2.COLOR_BGR2GRAY)
+                    seg_img = Image.fromarray(seg_gray, 'L')
+                    # plt.imshow(seg_img)
+                    # plt.show()
+                    seg_path_save = "D:/# Raras/src/makeup_dataset/final/no_makeup_segs/" + str(img_name)
+                    seg_img.save(seg_path_save)
                 else:
                     print("No face Detectedd")
             except:
                 img = Image.open(instance)
-                img_path = "D:/# Raras/src/data/error/cobalagii/alignface_" + str(count) +".jpg"
+                img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
                 img.save(img_path)
                 # print("gagal 1")
         else:
             img = Image.open(instance)
-            img_path = "D:/# Raras/src/data/error/cobalagii/pose_" + str(count) +".jpg"
+            img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
             img.save(img_path)
             # print("gagal 2")
         count +=1
