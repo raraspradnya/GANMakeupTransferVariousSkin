@@ -2,7 +2,6 @@
 # -*- encoding: utf-8 -*-
 
 from unittest import result
-from logger import setup_logger
 from model import BiSeNet
 import torch
 import os
@@ -67,6 +66,10 @@ def vis_parsing_maps(im, parsing_anno, stride, save_im=False, save_path='facepar
     vis_im = im.copy().astype(np.uint8)
     vis_parsing_anno = parsing_anno.copy().astype(np.uint8)
     vis_parsing_anno = cv2.resize(vis_parsing_anno, None, fx=stride, fy=stride, interpolation=cv2.INTER_NEAREST)
+    seg = Image.fromarray(vis_parsing_anno, 'L')
+    plt.imshow(seg)
+    plt.show()
+
     vis_parsing_anno_color = np.zeros((vis_parsing_anno.shape[0], vis_parsing_anno.shape[1], 3)) + 255
 
     num_of_class = np.max(vis_parsing_anno)
@@ -231,26 +234,27 @@ def create_mask(img):
         mask = np.array(mask)
         return mask
 
-test_set = []
-for (path, dirnames, filenames) in os.walk('D:/# Raras/src/data/edited/final'):
-    test_set.extend(os.path.join(path, name) for name in filenames)
+# test_set = []
+# for (path, dirnames, filenames) in os.walk('D:/# Raras/src/data/edited/final'):
+#     test_set.extend(os.path.join(path, name) for name in filenames)
 
-for instance in test_set:
-    if (os.path.exists(instance.strip())):
-        print("Parsing... ", instance)
-        img_name= instance[32:]
-        img_path = "D:/# Raras/src/makeup_dataset/final/makeup/scrape/" + str(img_name)[:-4] + ".png" 
-        img = cv2.imread(instance)
-        seg = create_mask(img)
-        # vis_parsing_maps(img, seg, stride=1, save_im=True, save_path="./test-img/coba1.jpg")
+# for instance in test_set:
+#     if (os.path.exists(instance.strip())):
+#         print("Parsing... ", instance)
+#         img_name= instance[32:]
+#         img_path = "D:/# Raras/src/makeup_dataset/final/makeup/scrape/" + str(img_name)[:-4] + ".png" 
+#         img = cv2.imread(instance)
 
-        img = Image.fromarray(img[:,:,::-1], 'RGB')
-        # plt.imshow(img)
-        # plt.show()
-        
-        img.save(img_path)
-        seg_path = "D:/# Raras/src/makeup_dataset/final/makeup_segs/scrape/" + str(img_name)[:-4] + ".png" 
-        seg = Image.fromarray(seg)
-        # plt.imshow(seg)
-        # plt.show()
-        seg.save(seg_path)
+#         seg = create_mask(img)
+#         im = np.array(img)
+#         parsing_anno = np.array(seg)
+#         vis_im = im.copy().astype(np.uint8)
+#         vis_parsing_anno = parsing_anno.copy().astype(np.uint8)
+#         vis_parsing_anno = cv2.resize(vis_parsing_anno, None, fx=1, fy=1, interpolation=cv2.INTER_NEAREST)
+#         seg = Image.fromarray(vis_parsing_anno, 'L')
+#         seg_path = "D:/# Raras/src/makeup_dataset/final/makeup_segs/scrape/" + str(img_name)[:-4] + ".png" 
+#         seg.save(seg_path)
+
+
+#         img = Image.fromarray(img[:,:,::-1], 'RGB')
+#         img.save(img_path)

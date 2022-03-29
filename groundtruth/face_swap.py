@@ -228,7 +228,7 @@ def check_points(img,points):
     return False
 
 
-def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, args, end=68):
+def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, end=68):
     h, w = dst_face.shape[:2]
 
     ## 3d warp
@@ -239,20 +239,20 @@ def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, ar
     mask = np.asarray(mask * mask_src, dtype=np.uint8)
 
 
-    ## Correct color
-    if args.correct_color:
-        warped_src_face = apply_mask(warped_src_face, mask)
-        dst_face_masked = apply_mask(dst_face, mask)
-        warped_src_face = correct_colours(dst_face_masked, warped_src_face, dst_points)
-    ## 2d warp
-    if args.warp_2d:
-        unwarped_src_face = warp_image_3d(warped_src_face, dst_points[:end], src_points[:end], src_face.shape[:2])
-        warped_src_face = warp_image_2d(unwarped_src_face, transformation_from_points(dst_points, src_points),
-                                        (h, w, 3))
+    # ## Correct color
+    # if args.correct_color:
+    #     warped_src_face = apply_mask(warped_src_face, mask)
+    #     dst_face_masked = apply_mask(dst_face, mask)
+    #     warped_src_face = correct_colours(dst_face_masked, warped_src_face, dst_points)
+    # ## 2d warp
+    # if args.warp_2d:
+    #     unwarped_src_face = warp_image_3d(warped_src_face, dst_points[:end], src_points[:end], src_face.shape[:2])
+    #     warped_src_face = warp_image_2d(unwarped_src_face, transformation_from_points(dst_points, src_points),
+    #                                     (h, w, 3))
 
-        mask = mask_from_points((h, w), dst_points)
-        mask_src = np.mean(warped_src_face, axis=2) > 0
-        mask = np.asarray(mask * mask_src, dtype=np.uint8)
+    #     mask = mask_from_points((h, w), dst_points)
+    #     mask_src = np.mean(warped_src_face, axis=2) > 0
+    #     mask = np.asarray(mask * mask_src, dtype=np.uint8)
 
     ##Poisson Blending
     r = cv2.boundingRect(mask)

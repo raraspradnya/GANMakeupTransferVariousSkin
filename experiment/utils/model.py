@@ -304,6 +304,7 @@ class NNModel(object):
                     print('rec : {:.3f}, per : {:.3f}, makeup : {:.3f}, IMRL : {:.3f}, attenton : {:.3f}, adversarial : {:.3f}, kl : {:.3f}, tv : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy(), loss_list[5].numpy(), loss_list[6].numpy(), loss_list[7].numpy()))
                 if(step % 200 == 0):
                     save_images(epoch + 1, step, batch_features["images1"].numpy(), transfer_images.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
+                    save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), os.path.join(self.logs_path, 'save_gt'))
                 if(step == train_step):
                     break
             if (epoch + 1) % 5 == 0:

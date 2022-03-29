@@ -6,10 +6,9 @@ import tensorflow as tf
 from imgaug import augmenters as dataAug
 from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 from datetime import datetime
-from utils.helper import save_images
 
 
-from utils.helper import hist_match_func, masking_func, eye_regions_func
+from utils.helper import hist_match_func, masking_func, eye_regions_func, warping
 
 NUM_PARALLEL_CALLS = 2
 SHUFFLE_BUFFER_SIZE = 2000
@@ -215,7 +214,7 @@ class Dataset(object):
         return (tf.cast(image, tf.float32) / 255.0 - 0.5) * 2
 
     @tf.function
-    def getMakeupGroundTruth(self, images, masks, reference_images, reference_masks):
+    def getMakeupGroundTruth_histogram(self, images, masks, reference_images, reference_masks):
         '''
         Generate the ground truth of all makeup regions.
 
@@ -259,6 +258,80 @@ class Dataset(object):
         r_lip = reference_images * r_lip_masks
 
         # histogram matching
+        face_true = tf.py_function(hist_match_func, inp=[face, r_face], Tout = tf.float32)
+        brow_true = tf.py_function(hist_match_func, inp=[brow, r_brow], Tout = tf.float32)
+        eye_true = tf.py_function(hist_match_func, inp=[eye, r_eye], Tout = tf.float32)
+        lip_true = tf.py_function(hist_match_func, inp=[lip, r_lip], Tout = tf.float32)
+        face_true.set_shape((self.batch_size, h , w, c))
+        brow_true.set_shape((self.batch_size, h , w, c))
+        eye_true.set_shape((self.batch_size, h , w, c))
+        lip_true.set_shape((self.batch_size, h , w, c))
+
+        # normalize ground truth
+        face_true = self.preprocess(face_true)
+        brow_true = self.preprocess(brow_true)
+        eye_true = self.preprocess(eye_true)
+        lip_true = self.preprocess(lip_true)
+
+        # prevent background form changing
+        face_true = face_true * face_masks
+        brow_true = brow_true * brow_masks
+        eye_true = eye_true * eye_masks
+        lip_true = lip_true * lip_masks
+        return [face_true, brow_true, eye_true, lip_true], [face_masks, brow_masks, eye_masks, lip_masks]
+    
+    @tf.function
+    def getMakeupGroundTruth(self, images, masks, reference_images, reference_masks):
+        '''
+        Generate the ground truth of all makeup regions.
+
+        Args:
+            images : a batch of source images.
+            masks : a batch of source masks.
+            reference_images : a batch of reference images.
+            reference_masks : a batch of reference masks.
+        
+        Returns:
+            A dictionary that contains the data information for training.
+        '''
+        h, w, c = self.image_shape[:3]
+
+        # get source mask of each source makeup region
+        hair_masks = masking_func(masks, tf.constant(self.classes["hair"], dtype = tf.int32))
+        face_masks = masking_func(masks, tf.constant(self.classes["face"], dtype = tf.int32))
+        brow_masks = masking_func(masks, tf.constant(self.classes["brow"], dtype = tf.int32))
+        eye_masks = masking_func(masks, tf.constant(self.classes["eye"], dtype = tf.int32))
+        eye_masks = tf.clip_by_value(eye_regions_func(eye_masks), 0, 1)
+        eye_masks = tf.clip_by_value(eye_masks - hair_masks - brow_masks, 0, 1)
+        lip_masks = masking_func(masks, tf.constant(self.classes["lip"], dtype = tf.int32))
+        
+        face = images * face_masks
+        brow = images * brow_masks
+        eye = images * eye_masks
+        lip = images * lip_masks
+
+        # get reference mask of each reference makeup region
+        r_hair_masks = masking_func(reference_masks, tf.constant(self.classes["hair"], dtype = tf.int32))
+        r_face_masks = masking_func(reference_masks, tf.constant(self.classes["face"], dtype = tf.int32))
+        r_brow_masks = masking_func(reference_masks, tf.constant(self.classes["brow"], dtype = tf.int32))
+        r_eye_masks = masking_func(reference_masks, tf.constant(self.classes["eye"], dtype = tf.int32))
+        r_eye_masks = tf.clip_by_value(eye_regions_func(r_eye_masks) - r_eye_masks, 0, 1)
+        r_eye_masks = tf.clip_by_value(r_eye_masks - r_hair_masks - r_brow_masks, 0, 1)
+        r_lip_masks = masking_func(reference_masks, tf.constant(self.classes["lip"], dtype = tf.int32))
+        r_whole_face_masks = masking_func(masks, tf.constant(self.classes["whole_face"], dtype = tf.int32))
+
+        r_whole_face = reference_images * r_whole_face_masks
+
+        # Get ground truth
+        whole_face_true = tf.py_function(warping, inp=[images, r_whole_face], Tout = tf.float32)
+        whole_face_true.set_shape((self.batch_size, h, w, c))
+
+        r_face = whole_face_true * r_face_masks
+        r_brow = whole_face_true * r_brow_masks
+        r_eye = whole_face_true * r_eye_masks
+        r_lip = whole_face_true * r_lip_masks
+
+
         face_true = tf.py_function(hist_match_func, inp=[face, r_face], Tout = tf.float32)
         brow_true = tf.py_function(hist_match_func, inp=[brow, r_brow], Tout = tf.float32)
         eye_true = tf.py_function(hist_match_func, inp=[eye, r_eye], Tout = tf.float32)

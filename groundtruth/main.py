@@ -19,7 +19,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
  
     test_set = []
-    for (path, dirnames, filenames) in os.walk("D:/# Raras/src/data/edited/10n"):
+    for (path, dirnames, filenames) in os.walk("D:/# Raras/src/data/edited/10"):
         test_set.extend(os.path.join(path, name) for name in filenames)
 
     test_set1 = []
@@ -37,35 +37,35 @@ if __name__ == '__main__':
         dst_img = cv2.imread(non_makeup[i])
 
         src_img_seg = get_face(src_img)
-        try:
+        # try:
         # Select src face
-            src_points, src_shape, src_face = select_face(src_img_seg)
-            # Select dst face
-            dst_faceBoxes = select_all_faces(dst_img)
+        src_points, src_shape, src_face = select_face(src_img_seg)
+        # Select dst face
+        dst_faceBoxes = select_all_faces(dst_img)
 
-            if dst_faceBoxes is None:
-                print('Detect 0 Face !!!')
-                # exit(-1)
-                pass
-            else:
-                output = dst_img
-                for k, dst_face in dst_faceBoxes.items():
-                    output = face_swap(src_face, dst_face["face"], src_points,
-                                    dst_face["points"], dst_face["shape"],
-                                    output, args)
-            
-                # cv2.imshow("src_img",src_img)
-                # cv2.imshow("dst_img",dst_img)
-                # cv2.imshow("output",output)
-                # cv2.waitKey(0)
-                dim = (256,256)
-                src_img = cv2.resize(src_img, dim, interpolation = cv2.INTER_AREA)
-                dst_img = cv2.resize(dst_img, dim, interpolation = cv2.INTER_AREA)
-                output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
-                images = [src_img, dst_img, output]
-                new_im = cv2.hconcat(images)
+        if dst_faceBoxes is None:
+            print('Detect 0 Face !!!')
+            # exit(-1)
+            pass
+        else:
+            output = dst_img
+            for k, dst_face in dst_faceBoxes.items():
+                output = face_swap(src_face, dst_face["face"], src_points,
+                                dst_face["points"], dst_face["shape"],
+                                output)
+        
+            # cv2.imshow("src_img",src_img)
+            # cv2.imshow("dst_img",dst_img)
+            # cv2.imshow("output",output)
+            # cv2.waitKey(0)
+            dim = (256,256)
+            src_img = cv2.resize(src_img, dim, interpolation = cv2.INTER_AREA)
+            dst_img = cv2.resize(dst_img, dim, interpolation = cv2.INTER_AREA)
+            output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
+            images = [src_img, dst_img, output]
+            new_im = cv2.hconcat(images)
 
-                img_path = "D:/# Raras/src/data/groundtruth/coba/" + str(makeup[i][30:])
-                cv2.imwrite(img_path, new_im)
-        except:
-            print("gak bisa")
+            img_path = "D:/# Raras/src/data/groundtruth/coba/" + str(makeup[i][30:])
+            cv2.imwrite(img_path, new_im)
+        # except:
+        #     print("gak bisa")

@@ -184,7 +184,3 @@ class Converter(object):
         print('[Converter] Summary :')
         print('[Converter] Train data : {}'.format(train_dataset_size))
         print('[Converter] Test data : {}'.format(test_dataset_size))
-
-
-
-

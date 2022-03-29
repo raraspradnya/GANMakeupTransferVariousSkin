@@ -3,6 +3,10 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import cv2
+import sys
+sys.path.append('../')
+from groundtruth.face_detection import select_face, select_all_faces
+from groundtruth.face_swap import face_swap
 
 fig = plt.figure(figsize=(10,15))
 def save_images(epoch, step, origin_images, pred_images, reference_images, pic_save_path):
@@ -84,9 +88,47 @@ def hist_match_func(source, reference):
             interp_r_values = np.interp(s_quantiles, r_quantiles, r_values)
             interp_value[1:] = interp_r_values
             result[i,...,c] = interp_value[bin_idx].reshape(oldshape[1:3])
-    result = np.array(result, dtype = np.float32)
-    cv2.imshow("result", result)
-    cv2.waitKey(0)
+    result = np.array(result, dtype=np.float32)
+    return result
+
+def warping(source, reference):
+    '''
+        Warp reference (makeup face) to source image (non-makeup face)
+        input:
+            source : np.ndarray
+                original non-makeup face
+            reference : np.ndarray
+                segmented makeup face (only whole_face part of the image)
+        output:
+            result : np.ndarray
+                makeup face already warped to original non-makeup face
+    '''
+    oldshape = source.shape
+    batch_size = oldshape[0]
+    source = np.array(source, dtype = np.uint8)
+    reference = np.array(reference, dtype = np.uint8)
+    # get the set of unique pixel values and their corresponding indices and
+    # counts
+    result = np.zeros(oldshape, dtype = np.uint8)
+
+    
+    for i in range(batch_size):
+        s = source[i]
+        r = reference[i]
+        ref_points, ref_shape, ref_face = select_face(r)
+        src_faceBoxes = select_all_faces(s)
+        output = s
+        for k, src_face in src_faceBoxes.items():
+            output = face_swap(ref_face, src_face["face"], ref_points,
+                            src_face["points"], src_face["shape"],
+                            output)
+        # dim = (256,256)
+        # src_img = cv2.resize(s, dim, interpolation = cv2.INTER_AREA)
+        # dst_img = cv2.resize(r, dim, interpolation = cv2.INTER_AREA)
+        # output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
+        # images = [src_img, dst_img, output]
+        # new_im = cv2.hconcat(images)
+    result = np.array(output, dtype = np.float32)
     return result
 
 @tf.function
