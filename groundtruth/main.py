@@ -19,17 +19,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
  
     test_set = []
-    for (path, dirnames, filenames) in os.walk("D:/# Raras/src/data/edited/10"):
+    for (path, dirnames, filenames) in os.walk("D:/# Raras/GitHub/TA/experiment/data/RawData/images/makeup"):
         test_set.extend(os.path.join(path, name) for name in filenames)
 
     test_set1 = []
     for (path, dirnames, filenames) in os.walk('D:/# Raras/src/makeup_dataset/all/images/non-makeup'):
         test_set1.extend(os.path.join(path, name) for name in filenames)
 
-    makeup = test_set[:100]
-    non_makeup = test_set1[:100]
+    makeup = test_set
+    non_makeup = test_set1
 
-    for i in range (100):
+    for i in range (500):
         print("warping ", makeup[i], non_makeup[i])
 
         # Read images
@@ -65,7 +65,8 @@ if __name__ == '__main__':
             images = [src_img, dst_img, output]
             new_im = cv2.hconcat(images)
 
-            img_path = "D:/# Raras/src/data/groundtruth/coba/" + str(makeup[i][30:])
+            img_path = "D:/# Raras/src/data/groundtruth/coba/" + str(makeup[i][59:])
+            print(img_path)
             cv2.imwrite(img_path, new_im)
         # except:
         #     print("gak bisa")

@@ -323,7 +323,7 @@ class Dataset(object):
         r_whole_face = reference_images * r_whole_face_masks
 
         # Get ground truth
-        whole_face_true = tf.py_function(warping, inp=[images, r_whole_face], Tout = tf.float32)
+        whole_face_true = tf.py_function(warping, inp=[images, reference_images], Tout = tf.float32)
         whole_face_true.set_shape((self.batch_size, h, w, c))
 
         r_face = whole_face_true * r_face_masks

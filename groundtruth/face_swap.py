@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import scipy.spatial as spatial
 import logging
+import matplotlib.pyplot as plt
 
 ## 3D Transform
 def bilinear_interpolate(img, coords):
@@ -59,10 +60,15 @@ def process_warp(src_img, result_img, tri_affines, dst_points, delaunay):
         out_coords = np.dot(tri_affines[simplex_index],
                             np.vstack((coords.T, np.ones(num_coords))))
         x, y = coords.T
+        x0, y0 = out_coords
+        x1 = []
+        y1 = []
+        for i in range(len(x0)):
+            if (x0[i] < src_img.shape[1]) and (y0[i] < src_img.shape[0]):
+                x1.append(x0[i])
+                y1.append(y0[i])
+        out_coords = x1, y1
         result_img[y, x] = bilinear_interpolate(src_img, out_coords)
-    
-        # cv2.imshow("result_img", result_img)
-        # cv2.waitKey(0)
 
     return None
 
@@ -91,9 +97,6 @@ def warp_image_3d(src_img, src_points, dst_points, dst_shape, dtype=np.uint8):
     delaunay = spatial.Delaunay(dst_points)
     tri_affines = np.asarray(list(triangular_affine_matrices(
         delaunay.simplices, src_points, dst_points)))
-    # plt.triplot(dst_points[:,0], dst_points[:,1], delaunay.simplices)
-    # plt.plot(dst_points[:,0], dst_points[:,1], 'o')
-    # plt.show()
 
     process_warp(src_img, result_img, tri_affines, dst_points, delaunay)
 

@@ -31,34 +31,13 @@ def face_points_detection(img, bbox:dlib.rectangle):
 def select_face(im, r=10, choose=True):
     faces = face_detection(im)
 
-    if len(faces) == 0:
-        return None, None, None
+    # if len(faces) == 0:
+    #     return None, None, None
 
-    if len(faces) == 1 or not choose:
-        idx = np.argmax([(face.right() - face.left()) * (face.bottom() - face.top()) for face in faces])
-        bbox = faces[idx]
-    else:
-        bbox = []
+    # if len(faces) == 1 or not choose:
+    idx = np.argmax([(face.right() - face.left()) * (face.bottom() - face.top()) for face in faces])
+    bbox = faces[idx]
 
-        def click_on_face(event, x, y, flags, params):
-            if event != cv2.EVENT_LBUTTONDOWN:
-                return
-
-            for face in faces:
-                if face.left() < x < face.right() and face.top() < y < face.bottom():
-                    bbox.append(face)
-                    break
-
-        im_copy = im.copy()
-        for face in faces:
-            # draw the face bounding box
-            cv2.rectangle(im_copy, (face.left(), face.top()), (face.right(), face.bottom()), (0, 0, 255), 1)
-        cv2.imshow('Click the Face:', im_copy)
-        cv2.setMouseCallback('Click the Face:', click_on_face)
-        while len(bbox) == 0:
-            cv2.waitKey(1)
-        cv2.destroyAllWindows()
-        bbox = bbox[0]
 
     points = np.asarray(face_points_detection(im, bbox))
 
@@ -88,8 +67,8 @@ def select_face(im, r=10, choose=True):
 def select_all_faces(im, r=10):
     faces = face_detection(im)
 
-    if len(faces) == 0:
-        return None
+    # if len(faces) == 0:
+    #     return None
 
     faceBoxes = {k : {"points" : None,
                       "shape" : None,

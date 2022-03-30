@@ -3,6 +3,9 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import cv2
+from datetime import datetime
+
+
 import sys
 sys.path.append('../')
 from groundtruth.face_detection import select_face, select_all_faces
@@ -107,6 +110,10 @@ def warping(source, reference):
     batch_size = oldshape[0]
     source = np.array(source, dtype = np.uint8)
     reference = np.array(reference, dtype = np.uint8)
+    logdir = "logs/images/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    # Creates a file writer for the log directory.
+    file_writer = tf.summary.create_file_writer(logdir)
+
     # get the set of unique pixel values and their corresponding indices and
     # counts
     result = np.zeros(oldshape, dtype = np.uint8)
@@ -129,6 +136,12 @@ def warping(source, reference):
         # images = [src_img, dst_img, output]
         # new_im = cv2.hconcat(images)
     result = np.array(output, dtype = np.float32)
+    # Using the file writer, log the reshaped image.
+    with file_writer.as_default():
+        tf.summary.image("image ref", reference, step=0)
+        tf.summary.image("image source", source, step=0)
+        tf.summary.image("image results", result, step=0)
+        
     return result
 
 @tf.function

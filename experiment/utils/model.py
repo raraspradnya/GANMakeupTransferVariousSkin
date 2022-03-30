@@ -3,6 +3,7 @@ import cv2
 import shutil
 import threading
 import tensorflow as tf
+from datetime import datetime
 
 from utils.module import *
 from utils.losses import *
@@ -293,6 +294,11 @@ class NNModel(object):
             self.load_model(self.model, pretrained_model_path)
 
         print("[Model] Training....")
+        logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+        file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+        file_writer.set_as_default()
+        
+
         for epoch in range(epochs):
             step = 0
             for batch_features, batch_labels in dataset:
@@ -310,6 +316,17 @@ class NNModel(object):
             if (epoch + 1) % 5 == 0:
                 model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
                 self.save_model(self.model, model_path)
+            tf.summary.scalar('Epoch', epoch +1)
+            tf.summary.scalar('Generator Loss', gen_loss.numpy())
+            tf.summary.scalar('Discriminator Loss', dis_loss.numpy())
+            tf.summary.scalar('Reconstruction Loss', loss_list[0].numpy())
+            tf.summary.scalar('Perceptual Loss', loss_list[1].numpy())
+            tf.summary.scalar('Makeup Loss', loss_list[2].numpy())
+            tf.summary.scalar('IMRL Loss', loss_list[3].numpy())
+            tf.summary.scalar('Attention Loss', loss_list[4].numpy())
+            tf.summary.scalar('Adversarial Loss', loss_list[5].numpy())
+            tf.summary.scalar('KL Loss', loss_list[6].numpy())
+            tf.summary.scalar('Total Variation Loss', loss_list[7].numpy())
 
     def export_model(self, save_model_path, export_path):
         print("[Model] Exporting Model....")
