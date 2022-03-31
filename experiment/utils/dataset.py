@@ -138,11 +138,10 @@ class Dataset(object):
             A dictionary that contains the data information for training.
         '''
         h, w, c = self.image_shape[:3]
-        images1 = data1["images"]       
+        images1 = data1["images"] 
         images1_mask = data1["images_mask"]
         images2 = data2["images"]
-        images2_mask = data2["images_mask"]
-
+        images2_mask = data2["images_mask"]  
         # resize
         images1 = tf.image.resize(images1, size = (h, w), method = tf.image.ResizeMethod.BILINEAR)
         images1_mask = tf.image.resize(images1_mask, size = (h, w), method = tf.image.ResizeMethod.NEAREST_NEIGHBOR)
@@ -162,7 +161,6 @@ class Dataset(object):
         # processing makeup mask
         makeup_mask1 = tf.abs(1.0 -masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
         makeup_mask1 = tf.clip_by_value(tf.cast(makeup_mask1, dtype = tf.float32), 0, 1)
-
 
         # return data
         data = {'images1' : images1, 'images2' : images2}
@@ -311,31 +309,31 @@ class Dataset(object):
         lip = images * lip_masks
 
         # get reference mask of each reference makeup region
+        r_whole_face_masks = masking_func(reference_masks, tf.constant(self.classes["whole_face"], dtype = tf.int32))
         r_hair_masks = masking_func(reference_masks, tf.constant(self.classes["hair"], dtype = tf.int32))
         r_face_masks = masking_func(reference_masks, tf.constant(self.classes["face"], dtype = tf.int32))
         r_brow_masks = masking_func(reference_masks, tf.constant(self.classes["brow"], dtype = tf.int32))
         r_eye_masks = masking_func(reference_masks, tf.constant(self.classes["eye"], dtype = tf.int32))
-        r_eye_masks = tf.clip_by_value(eye_regions_func(r_eye_masks) - r_eye_masks, 0, 1)
+        r_eye_masks = tf.clip_by_value(eye_regions_func(r_eye_masks), 0, 1)
         r_eye_masks = tf.clip_by_value(r_eye_masks - r_hair_masks - r_brow_masks, 0, 1)
         r_lip_masks = masking_func(reference_masks, tf.constant(self.classes["lip"], dtype = tf.int32))
-        r_whole_face_masks = masking_func(masks, tf.constant(self.classes["whole_face"], dtype = tf.int32))
 
         r_whole_face = reference_images * r_whole_face_masks
 
         # Get ground truth
-        whole_face_true = tf.py_function(warping, inp=[images, reference_images], Tout = tf.float32)
+        whole_face_true = tf.py_function(warping, inp=[images, r_whole_face], Tout = tf.float32)
+
+        face_true = whole_face_true * face_masks
+        brow_true = whole_face_true * brow_masks
+        eye_true = whole_face_true * eye_masks
+        lip_true = whole_face_true * lip_masks
+
         whole_face_true.set_shape((self.batch_size, h, w, c))
 
-        r_face = whole_face_true * r_face_masks
-        r_brow = whole_face_true * r_brow_masks
-        r_eye = whole_face_true * r_eye_masks
-        r_lip = whole_face_true * r_lip_masks
-
-
-        face_true = tf.py_function(hist_match_func, inp=[face, r_face], Tout = tf.float32)
-        brow_true = tf.py_function(hist_match_func, inp=[brow, r_brow], Tout = tf.float32)
-        eye_true = tf.py_function(hist_match_func, inp=[eye, r_eye], Tout = tf.float32)
-        lip_true = tf.py_function(hist_match_func, inp=[lip, r_lip], Tout = tf.float32)
+        # face_true = tf.py_function(hist_match_func, inp=[face, r_face], Tout = tf.float32)
+        # brow_true = tf.py_function(hist_match_func, inp=[brow, r_brow], Tout = tf.float32)
+        # eye_true = tf.py_function(hist_match_func, inp=[eye, r_eye], Tout = tf.float32)
+        # lip_true = tf.py_function(hist_match_func, inp=[lip, r_lip], Tout = tf.float32)
         face_true.set_shape((self.batch_size, h , w, c))
         brow_true.set_shape((self.batch_size, h , w, c))
         eye_true.set_shape((self.batch_size, h , w, c))

@@ -9,7 +9,7 @@ from utils.module import *
 from utils.losses import *
 from utils.helper import *
 
-class NNModel(object):
+class Model_BG(object):
     def __init__(self, input_shape, logs_path, batch_size = 32, classes = None):
         self.input_shape = input_shape
         self.batch_size = batch_size
@@ -94,88 +94,25 @@ class NNModel(object):
         loss = reconsructed_loss + perceptual_loss + makeup_loss + IMRL_loss + attention_loss + adversarial_loss + kl_loss + tv_loss
         return loss,  [reconsructed_loss, perceptual_loss, makeup_loss, IMRL_loss, attention_loss, adversarial_loss, kl_loss, tv_loss]
 
-    def build_identity_encoder(self):
-        print("[Model] Building Identity Encoder....")
-        image = tf.keras.layers.Input(self.input_shape)
-        x = image
-
-        x = Conv2D_layer(x, filters = 64, kernel_size = (7, 7))
-        x = InstanceNormalization_layer(x)
-        x = ReLU_layer(x)
-        x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3), strides = (2, 2))
-        x = InstanceNormalization_layer(x)
-        x = ReLU_layer(x)
-        x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3), strides = (2, 2))
-        x = InstanceNormalization_layer(x)
-        x = ReLU_layer(x)
-
-        for _ in range(4):
-            residual = x
-            x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
-            x = InstanceNormalization_layer(x)
-            x = ReLU_layer(x)
-            x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
-            x = InstanceNormalization_layer(x)
-            x = tf.math.add(residual, x)
-
-        model = tf.keras.Model(inputs = image, outputs = x)
-        return model
-
-    def build_makeup_encoder(self):
-        print("[Model] Building Makeup Encoder....")
-        image = tf.keras.layers.Input(self.input_shape)
-        x = image
-
-        x = Conv2D_layer(x, filters = 64, kernel_size = (7, 7))
-        x = ReLU_layer(x)
-        x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3), strides = (2, 2))
-        x = ReLU_layer(x)
-    
-        x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3), strides = (2, 2))
-        x = ReLU_layer(x)
-        x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3), strides = (2, 2))
-        x = ReLU_layer(x)
-        x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3), strides = (2, 2))
-        x = ReLU_layer(x)
-
-        x = GlobalAveragePooling2D(x)
-        mean = Dense_layer(x, units = 8)
-        stddev = Dense_layer(x, units = 8)
-
-        model = tf.keras.Model(inputs = image, outputs = [mean, stddev])
-        return model
-
-    def build_context_encoder(self):
-        print("[Model] Building Context Encoder....")
-        makeup_code = tf.keras.layers.Input((8,)) 
-
-        x = Dense_layer(makeup_code, units = 32)
-        x = ReLU_layer(x)
-        x = Dense_layer(x, units = 32)
-        x = ReLU_layer(x)
-
-        hidden_code1 = Dense_layer(x, units = 8)
-        hidden_code2 = Dense_layer(x, units = 8)
-
-        model = tf.keras.Model(inputs = makeup_code, outputs = [hidden_code1, hidden_code2])
-        return model
 
     def build_generator(self):
-        print("[Model] Building Generator....")
-        identity_code = tf.keras.layers.Input((56, 56, 256))
-        hidden_code1 = tf.keras.layers.Input((8,)) 
-        hidden_code2 = tf.keras.layers.Input((8,))
+        print("[Model BeautyGAN] Building Generator....")
+        image_source = tf.keras.layers.Input(self.input_shape)
+        image_reference = tf.keras.layers.Input(self.input_shape)
 
-        x = identity_code
-        for i in range(4):
-            res = x
-            x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
-            x = AdaInstanceNormalization_layer(x, hidden_code1)
-            x = ReLU_layer(x)
-            x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
-            x = AdaInstanceNormalization_layer(x, hidden_code2)
-            x = tf.add(x, res)
-            x = ReLU_layer(x)
+        x = Conv2D_layer(image_source, filters = 64, kernel_size = (7, 7), strides=(2, 2))
+        x = InstanceNormalization_layer(x)
+        x = ReLU_layer(x)
+        x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
+        x = InstanceNormalization_layer(x)
+        x = ReLU_layer(x)
+
+        y = Conv2D_layer(image_reference, filters = 64, kernel_size = (3, 3), strides=(2, 2))
+        y = InstanceNormalization_layer(y)
+        y = ReLU_layer(y)
+        y = Conv2D_layer(y, filters = 256, kernel_size = (3, 3))
+        y = InstanceNormalization_layer(y) # vSYYZ617.png
+        y = ReLU_layer(y)
 
         x = UpSampling2D_layer(x, size = (2, 2))
         x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3))
@@ -197,7 +134,7 @@ class NNModel(object):
         return model
 
     def build_discriminator(self):
-        print("[Model] Building Discriminator....")
+        print("[Model BeautyGAN] Building Discriminator....")
         image = tf.keras.layers.Input(self.input_shape)
 
         x = image
@@ -209,8 +146,6 @@ class NNModel(object):
         x = LeakyReLU_layer(x)
         x = Conv2D_layer(x, filters = 512, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 1024, kernel_size = (4, 4), strides = (2, 2))
-        x = LeakyReLU_layer(x)
         x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3))
         x = tf.nn.sigmoid(x)
 
@@ -218,7 +153,7 @@ class NNModel(object):
         return model
 
     def build(self, isLoadWeight = False):
-        print("[Model] Building Train Model....")
+        print("[Model BeautyGAN] Building Train Model....")
         # Training flow
         image1 = tf.keras.layers.Input(self.input_shape, name = "images1")
         image2 = tf.keras.layers.Input(self.input_shape, name = "images2") 
@@ -293,7 +228,10 @@ class NNModel(object):
         if(pretrained_model_path != None):
             self.load_model(self.model, pretrained_model_path)
 
-        print("[Model] Training....")
+        print("[Model BeautyGAN] Training....")
+        logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+        file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+        file_writer.set_as_default()
         
 
         for epoch in range(epochs):
@@ -313,10 +251,20 @@ class NNModel(object):
             if (epoch + 1) % 5 == 0:
                 model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
                 self.save_model(self.model, model_path)
-            log(epoch, gen_loss, dis_loss, loss_list)
-       
+            tf.summary.scalar('Epoch', epoch +1)
+            tf.summary.scalar('Generator Loss', gen_loss.numpy())
+            tf.summary.scalar('Discriminator Loss', dis_loss.numpy())
+            tf.summary.scalar('Reconstruction Loss', loss_list[0].numpy())
+            tf.summary.scalar('Perceptual Loss', loss_list[1].numpy())
+            tf.summary.scalar('Makeup Loss', loss_list[2].numpy())
+            tf.summary.scalar('IMRL Loss', loss_list[3].numpy())
+            tf.summary.scalar('Attention Loss', loss_list[4].numpy())
+            tf.summary.scalar('Adversarial Loss', loss_list[5].numpy())
+            tf.summary.scalar('KL Loss', loss_list[6].numpy())
+            tf.summary.scalar('Total Variation Loss', loss_list[7].numpy())
+
     def export_model(self, save_model_path, export_path):
-        print("[Model] Exporting Model....")
+        print("[Model BeautyGAN] Exporting Model....")
         self.load_model(self.model, save_model_path)
 
         # Makeup Encoder
@@ -346,8 +294,8 @@ class NNModel(object):
 
     def save_model(self, model, model_path):
         model.save_weights(model_path)
-        print('[Model] Save weights to {}.'.format(model_path))
+        print('[Model BeautyGAN] Save weights to {}.'.format(model_path))
 
     def load_model(self, model, model_path):
         model.load_weights(model_path)
-        print('[Model] Load weights from {}.'.format(model_path))
+        print('[Model BeautyGAN] Load weights from {}.'.format(model_path))

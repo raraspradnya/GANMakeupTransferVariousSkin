@@ -61,13 +61,18 @@ def process_warp(src_img, result_img, tri_affines, dst_points, delaunay):
                             np.vstack((coords.T, np.ones(num_coords))))
         x, y = coords.T
         x0, y0 = out_coords
-        x1 = []
-        y1 = []
+        x_src = []
+        y_src = []
+        x_res = []
+        y_res = []
         for i in range(len(x0)):
-            if (x0[i] < src_img.shape[1]) and (y0[i] < src_img.shape[0]):
-                x1.append(x0[i])
-                y1.append(y0[i])
-        out_coords = x1, y1
+            if (x0[i] + 1 < src_img.shape[1]) and (y0[i] + 1 < src_img.shape[0] and x[i] < result_img.shape[1] and y[i] < result_img.shape[0]):
+                x_src.append(x0[i])
+                y_src.append(y0[i])
+                x_res.append(x[i])
+                y_res.append(y[i])
+        out_coords = x_src, y_src
+        x, y = x_res, y_res
         result_img[y, x] = bilinear_interpolate(src_img, out_coords)
 
     return None

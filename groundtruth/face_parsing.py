@@ -110,7 +110,7 @@ def get_face(img):
         parsing = out.squeeze(0).cpu().numpy().argmax(0)
         # print(parsing)
         lst1 = np.unique(parsing)
-        print("Output list : ", lst1)
+        # print("Output list : ", lst1)
 
         # vis_parsing_maps(image, parsing, stride=1, save_im=True, save_path='C:/Users/RYZEN 9/Documents/GitHub/TA/faceparsing/res/test_res/seg.jpg')
 

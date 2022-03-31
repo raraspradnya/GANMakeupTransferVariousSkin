@@ -31,14 +31,13 @@ def face_points_detection(img, bbox:dlib.rectangle):
 def select_face(im, r=10, choose=True):
     faces = face_detection(im)
 
-    # if len(faces) == 0:
+    if len(faces) == 0:
+        return [], (0,0,0,0), im, 0
     #     return None, None, None
 
     # if len(faces) == 1 or not choose:
     idx = np.argmax([(face.right() - face.left()) * (face.bottom() - face.top()) for face in faces])
     bbox = faces[idx]
-
-
     points = np.asarray(face_points_detection(im, bbox))
 
     im_w, im_h = im.shape[:2]
@@ -61,7 +60,7 @@ def select_face(im, r=10, choose=True):
     mask_eye = cv2.fillConvexPoly(mask_eye, convexhull_mouth, 255)
     im[mask_eye == 255] = 0
 
-    return points - np.asarray([[x, y]]), (x, y, w, h), im[y:y + h, x:x + w]
+    return points - np.asarray([[x, y]]), (x, y, w, h), im[y:y + h, x:x + w], 1
 
 
 def select_all_faces(im, r=10):

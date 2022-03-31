@@ -14,7 +14,7 @@ params = {
         "pretrained_model_path" : None,#'logs/pretrained/0100.ckpt',
 
         "train_dataset_path" : {'source' : r'./data/source/Train', 'reference' : r'./data/reference/Train'},
-        "train_dataset_size" : [3450, 2447],
+        "train_dataset_size" : [2563, 1787],
         "test_dataset_path" : [r'./data/source/Test', r'./data/reference/Test'],
         }
 

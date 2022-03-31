@@ -110,38 +110,31 @@ def warping(source, reference):
     batch_size = oldshape[0]
     source = np.array(source, dtype = np.uint8)
     reference = np.array(reference, dtype = np.uint8)
-    logdir = "logs/images/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-    # Creates a file writer for the log directory.
-    file_writer = tf.summary.create_file_writer(logdir)
+
+    # # Using the file writer, log the reshaped image.
+    # logdir = "logs/images/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    # # Creates a file writer for the log directory.
+    # file_writer = tf.summary.create_file_writer(logdir)
+    # with file_writer.as_default():
+    #     tf.summary.image("image ref", reference, step=0)
+    #     tf.summary.image("image source", source, step=0)
 
     # get the set of unique pixel values and their corresponding indices and
     # counts
     result = np.zeros(oldshape, dtype = np.uint8)
-
-    
     for i in range(batch_size):
         s = source[i]
         r = reference[i]
-        ref_points, ref_shape, ref_face = select_face(r)
+        ref_points, ref_shape, ref_face, check = select_face(r)
+        if (check ==  0):
+            return result
         src_faceBoxes = select_all_faces(s)
         output = s
         for k, src_face in src_faceBoxes.items():
-            output = face_swap(ref_face, src_face["face"], ref_points,
+            result[i] = (face_swap(ref_face, src_face["face"], ref_points,
                             src_face["points"], src_face["shape"],
-                            output)
-        # dim = (256,256)
-        # src_img = cv2.resize(s, dim, interpolation = cv2.INTER_AREA)
-        # dst_img = cv2.resize(r, dim, interpolation = cv2.INTER_AREA)
-        # output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
-        # images = [src_img, dst_img, output]
-        # new_im = cv2.hconcat(images)
-    result = np.array(output, dtype = np.float32)
-    # Using the file writer, log the reshaped image.
-    with file_writer.as_default():
-        tf.summary.image("image ref", reference, step=0)
-        tf.summary.image("image source", source, step=0)
-        tf.summary.image("image results", result, step=0)
-        
+                            output))
+    result = np.array(result, dtype = np.float32)
     return result
 
 @tf.function
@@ -164,3 +157,19 @@ def eye_regions_func(mask):
     vertical = vertical_n * vertical_r
     horizontal = horizontal_n * horizontal_r
     return (vertical * horizontal)
+
+def log(epoch, gen_loss, dis_loss, loss_list):
+    logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+    file_writer.set_as_default()
+    tf.summary.scalar('Epoch', epoch +1, step=epoch)
+    tf.summary.scalar('Generator Loss', gen_loss.numpy(), step=epoch)
+    tf.summary.scalar('Discriminator Loss', dis_loss.numpy(), step=epoch)
+    tf.summary.scalar('Reconstruction Loss', loss_list[0].numpy(), step=epoch)
+    tf.summary.scalar('Perceptual Loss', loss_list[1].numpy(), step=epoch)
+    tf.summary.scalar('Makeup Loss', loss_list[2].numpy(), step=epoch)
+    tf.summary.scalar('IMRL Loss', loss_list[3].numpy(), step=epoch)
+    tf.summary.scalar('Attention Loss', loss_list[4].numpy(), step=epoch)
+    tf.summary.scalar('Adversarial Loss', loss_list[5].numpy(), step=epoch)
+    tf.summary.scalar('KL Loss', loss_list[6].numpy(), step=epoch)
+    tf.summary.scalar('Total Variation Loss', loss_list[7].numpy(), step=epoch)
