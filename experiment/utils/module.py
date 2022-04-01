@@ -13,6 +13,13 @@ def Conv2D_layer(x, filters, kernel_size, *args, **kwargs):
     x = tf.keras.layers.Conv2D(filters = filters, kernel_size = kernel_size, *args, **default_kwargs)(x)
     return x
 
+def Dilated_layer(x, filters, kernel_size, dilation, *args, **kwargs):
+    default_kwargs = {'strides' : (1, 1), 'kernel_regularizer': kernel_reg, 'padding' : 'same', 'kernel_initializer' : tf.keras.initializers.he_normal()}
+    default_kwargs.update(kwargs)
+
+    x = tf.keras.layers.Conv2D(filters = filters, kernel_size = kernel_size, dilation_rate = dilation, *args, **default_kwargs)(x)
+    return x
+
 def UpSampling2D_layer(x, size, *args, **kwargs):
     default_kwargs = {}
     default_kwargs.update(kwargs)
@@ -36,6 +43,18 @@ def InstanceNormalization_layer(x, *args, **kwargs):
     default_kwargs = {"axis" : 3,  "center" : True, "scale" : True, "beta_initializer" : "random_uniform", "gamma_initializer" : "random_uniform"}
     default_kwargs.update(kwargs)
     x = tfa.layers.InstanceNormalization(axis = 3, center = True, scale = True)(x)
+    return x
+
+def Concatenate_layer(x, y, axis, *args, **kwargs):
+    default_kwargs = {"axis" : 1}
+    default_kwargs.update(kwargs)
+    x = tf.keras.layers.concatenate([x, y], axis=axis)
+    return x
+
+def Dropout_layer(x, rate, *args, **kwargs):
+    default_kwargs = {"rate" : 0.2}
+    default_kwargs.update(kwargs)
+    x = tf.keras.layers.Dropout(x, rate)
     return x
 
 def AdaInstanceNormalization_layer(content, style, epsilon=1e-5):
