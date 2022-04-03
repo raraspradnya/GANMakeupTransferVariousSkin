@@ -52,6 +52,12 @@ def InstanceNormalization_layer(x, *args, **kwargs):
     x = tfa.layers.InstanceNormalization(axis = 3, center = True, scale = True)(x)
     return x
 
+def SpectrumNormalization_Conv2D_Layer(x, filters, kernel_size, *args, **kwargs):
+    default_kwargs = {'strides' : (1, 1), 'kernel_regularizer': kernel_reg, 'padding' : 'same', 'kernel_initializer' : tf.keras.initializers.he_normal()}
+    default_kwargs.update(kwargs)
+    x = tfa.layers.SpectralNormalization(tf.keras.layers.Conv2D(filters = filters, kernel_size = kernel_size, *args, **default_kwargs))(x)
+    return x
+
 def Concatenate_layer(x, y, axis, *args, **kwargs):
     default_kwargs = {"axis" : 1}
     default_kwargs.update(kwargs)

@@ -125,9 +125,6 @@ class Model_BG(object):
             x = ReLU_layer(x)
 
         # UPSAMPLING
-        x = DeConv2D_layer(x, filters = 256, kernel_size = (4, 4), strides=(2, 2))
-        x = InstanceNormalization_layer(x)
-        x = ReLU_layer(x)
         x = DeConv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2, 2))
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
@@ -163,13 +160,13 @@ class Model_BG(object):
         image = tf.keras.layers.Input(self.input_shape)
 
         x = image
-        x = Conv2D_layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 512, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 512, kernel_size = (4, 4))
         x = LeakyReLU_layer(x)
         x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3))
         x = tf.nn.sigmoid(x)
@@ -183,13 +180,13 @@ class Model_BG(object):
         image = tf.keras.layers.Input(self.input_shape)
 
         x = image
-        x = Conv2D_layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 512, kernel_size = (4, 4), strides = (2, 2))
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 512, kernel_size = (4, 4))
         x = LeakyReLU_layer(x)
         x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3))
         x = tf.nn.sigmoid(x)
