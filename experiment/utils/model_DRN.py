@@ -32,10 +32,6 @@ class Model_DRN(object):
         self.feature_model.trainable = False        
         del vgg16_model
 
-
-        self.identity_encoder = self.build_identity_encoder()
-        self.makeup_encoder = self.build_makeup_encoder()
-        self.context_encoder = self.build_context_encoder()
         self.generator = self.build_generator()
         self.model = self.build()
         self.discriminator = self.build_discriminator()
@@ -149,8 +145,6 @@ class Model_DRN(object):
         x = LeakyReLU_layer(x)
         x = Conv2D_layer(x, filters = 512, kernel_size = (4, 4), strides = (2, 2))
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 1024, kernel_size = (4, 4), strides = (2, 2))
-        x = LeakyReLU_layer(x)
         x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3))
         x = tf.nn.sigmoid(x)
 
@@ -163,39 +157,22 @@ class Model_DRN(object):
         image1 = tf.keras.layers.Input(self.input_shape, name = "images1")
         image2 = tf.keras.layers.Input(self.input_shape, name = "images2") 
 
-        # get code
-        identity_code = self.identity_encoder(image1)
-        code1_mean, code1_var = self.makeup_encoder(image1)
-        code2_mean, code2_var = self.makeup_encoder(image2)
-
-        epsilon = tf.random.normal(tf.shape(code1_mean), name = "epsilon1")
-        makeup_code1 = code1_mean + K.exp(code1_var / 2) * epsilon
-        epsilon = tf.random.normal(tf.shape(code2_mean), name = "epsilon2")
-        makeup_code2 = code2_mean + K.exp(code2_var / 2) * epsilon
-        context_code1, context_code2 = self.context_encoder(makeup_code1), self.context_encoder(makeup_code2)
-
-        # reconsructed image and attention mask
-        reconsructed_images, attention_mask = self.generator([identity_code, context_code1[0], context_code1[1]])
-        reconsructed_images = attention_mask * reconsructed_images + (1 - attention_mask) * image1
-
         # transfer image
-        transfer_images, transfer_mask = self.generator([identity_code, context_code2[0], context_code2[1]])
+        transfer_images, transfer_mask = self.generator([image1, image2])
         transfer_images = transfer_mask * transfer_images + (1 - transfer_mask) * image1
 
-        # transfer code
-        transfer_identity_code = self.identity_encoder(transfer_images)
-        transfer_makeup_code = self.makeup_encoder(transfer_images)
+        # reconsructed image and attention mask
+        reconsructed_images, attention_mask = self.generator([transfer_images, image1])
+        reconsructed_images = attention_mask * reconsructed_images + (1 - attention_mask) * image1
 
         # fake imag
-        batch_size = tf.shape(identity_code)[0]
+        batch_size = tf.shape(image2)[0]
         random_code = tf.random.normal([batch_size, 8])
-        random_hidden_code = self.context_encoder(random_code)
-        fake_images, fake_masks = self.generator([identity_code, random_hidden_code[0], random_hidden_code[1]])
+        fake_images, fake_masks = self.generator([image1, random_hidden_code[0], random_hidden_code[1]])
         fake_images = fake_masks * fake_images + (1 - fake_masks) * image1
 
         # Loss Function
         pred = {"image" : [reconsructed_images, transfer_images], "mask" : [attention_mask, transfer_mask],
-                "code" : [identity_code, [code1_mean, code1_var], [code2_mean, code2_var], transfer_identity_code, transfer_makeup_code],
                 "fake_images" : fake_images, "transfer_images" : transfer_images
         }
 
@@ -250,9 +227,8 @@ class Model_DRN(object):
                     save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), os.path.join(self.logs_path, 'save_gt'))
                 if(step == train_step):
                     break
-            if (epoch + 1) % 5 == 0:
-                model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
-                self.save_model(self.model, model_path)
+            model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
+            self.save_model(self.model, model_path)
             log(epoch, gen_loss, dis_loss, loss_list)
        
     def export_model(self, save_model_path, export_path):

@@ -17,6 +17,7 @@ class Model_BG(object):
         self.logs_path = logs_path
         self.model_path = os.path.join(self.logs_path, 'checkpoint')
         self.pic_save_path = os.path.join(logs_path, 'save_pic')
+        self.gt_save_path = os.path.join(logs_path, 'save_gt')
 
         # Define optimizer
         learning_rate_fn_1 = tf.keras.optimizers.schedules.PolynomialDecay(2e-4, 155250, 1e-6, power=1.0)
@@ -31,13 +32,10 @@ class Model_BG(object):
         self.feature_model.trainable = False        
         del vgg16_model
 
-
-        self.identity_encoder = self.build_identity_encoder()
-        self.makeup_encoder = self.build_makeup_encoder()
-        self.context_encoder = self.build_context_encoder()
         self.generator = self.build_generator()
         self.model = self.build()
-        self.discriminator = self.build_discriminator()
+        self.discriminator_X = self.build_discriminator_X()
+        self.discriminator_Y = self.build_discriminator_Y()
 
     @tf.function
     def loss_function(self, pred, labels, dis_fake_output):
@@ -100,41 +98,88 @@ class Model_BG(object):
         image_source = tf.keras.layers.Input(self.input_shape)
         image_reference = tf.keras.layers.Input(self.input_shape)
 
+        # DOWNSAMPLING BRANCH
+        # SOURCE BRANCH
         x = Conv2D_layer(image_source, filters = 64, kernel_size = (7, 7), strides=(2, 2))
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
-        x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
+        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2,2))
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
 
+        # REFERENCE BRANCH
         y = Conv2D_layer(image_reference, filters = 64, kernel_size = (3, 3), strides=(2, 2))
         y = InstanceNormalization_layer(y)
         y = ReLU_layer(y)
-        y = Conv2D_layer(y, filters = 256, kernel_size = (3, 3))
-        y = InstanceNormalization_layer(y) # vSYYZ617.png
+        y = Conv2D_layer(y, filters = 128, kernel_size = (4, 4), strides=(2,2))
+        y = InstanceNormalization_layer(y)
         y = ReLU_layer(y)
 
-        x = UpSampling2D_layer(x, size = (2, 2))
-        x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3))
-        #x = LayerNormalization_layer(x)
+        # CONCATENATE
+        x = Concatenate_layer(x, y, axis=1)
+
+        # DOWNSAMPLING
+        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2, 2))
+        x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
 
-        x = UpSampling2D_layer(x, size = (2, 2))
-        x = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
-        #x = LayerNormalization_layer(x)
+        # RESIDUAL BLOCK
+        for i in range(6):
+            x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
+            x = InstanceNormalization_layer(x)
+            x = ReLU_layer(x)
+
+        # UPSAMPLING
+        x = DeConv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2, 2))
+        x = InstanceNormalization_layer(x)
+        x = ReLU_layer(x)
+        x = DeConv2D_layer(x, filters = 64, kernel_size = (4, 4), strides=(2, 2))
+        x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
 
-        image = Conv2D_layer(x, filters = 3, kernel_size = (7, 7))
-        image = tf.nn.tanh(image)
-    
-        mask = Conv2D_layer(x, filters = 1, kernel_size = (7, 7))
-        mask = tf.nn.sigmoid(mask)
+        # UPSAMPLING BRANCH
+        res_source = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_source = InstanceNormalization_layer(res_source)
+        res_source = ReLU_layer(res_source)
+        res_source = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_source = InstanceNormalization_layer(res_source)
+        res_source = ReLU_layer(res_source)
+        res_source = Conv2D_layer(x, filters = 3, kernel_size = (7, 7))
+        res_source = tf.nn.tanh(res_source)
 
-        model = tf.keras.Model(inputs = [identity_code, hidden_code1, hidden_code2], outputs = [image, mask])
+        res_reference = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_reference = InstanceNormalization_layer(res_reference)
+        res_reference = ReLU_layer(res_reference)
+        res_reference = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_reference = InstanceNormalization_layer(res_reference)
+        res_reference = ReLU_layer(res_reference)
+        res_reference = Conv2D_layer(x, filters = 3, kernel_size = (7, 7))
+        res_reference = tf.nn.tanh(res_reference)
+
+        model = tf.keras.Model(inputs = [image_source, image_reference], outputs = [res_source, res_reference])
         return model
 
-    def build_discriminator(self):
-        print("[Model BeautyGAN] Building Discriminator....")
+    def build_discriminator_X(self):
+        print("[Model BeautyGAN] Building Discriminator X....")
+        image = tf.keras.layers.Input(self.input_shape)
+
+        x = image
+        x = Conv2D_layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2))
+        x = LeakyReLU_layer(x)
+        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2))
+        x = LeakyReLU_layer(x)
+        x = Conv2D_layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2))
+        x = LeakyReLU_layer(x)
+        x = Conv2D_layer(x, filters = 512, kernel_size = (4, 4), strides = (2, 2))
+        x = LeakyReLU_layer(x)
+        x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3))
+        x = tf.nn.sigmoid(x)
+
+        model = tf.keras.Model(inputs = image, outputs = x)
+        return model
+
+    def build_discriminator_Y(self):
+        print("[Model BeautyGAN] Building Discriminator Y....")
         image = tf.keras.layers.Input(self.input_shape)
 
         x = image
@@ -158,28 +203,123 @@ class Model_BG(object):
         image1 = tf.keras.layers.Input(self.input_shape, name = "images1")
         image2 = tf.keras.layers.Input(self.input_shape, name = "images2") 
 
-        # get code
-        identity_code = self.identity_encoder(image1)
-        code1_mean, code1_var = self.makeup_encoder(image1)
-        code2_mean, code2_var = self.makeup_encoder(image2)
-
-        epsilon = tf.random.normal(tf.shape(code1_mean), name = "epsilon1")
-        makeup_code1 = code1_mean + K.exp(code1_var / 2) * epsilon
-        epsilon = tf.random.normal(tf.shape(code2_mean), name = "epsilon2")
-        makeup_code2 = code2_mean + K.exp(code2_var / 2) * epsilon
-        context_code1, context_code2 = self.context_encoder(makeup_code1), self.context_encoder(makeup_code2)
-
-        # reconsructed image and attention mask
-        reconsructed_images, attention_mask = self.generator([identity_code, context_code1[0], context_code1[1]])
-        reconsructed_images = attention_mask * reconsructed_images + (1 - attention_mask) * image1
-
         # transfer image
-        transfer_images, transfer_mask = self.generator([identity_code, context_code2[0], context_code2[1]])
-        transfer_images = transfer_mask * transfer_images + (1 - transfer_mask) * image1
+        result_source, result_reference = self.generator([image1, image2])
 
-        # transfer code
-        transfer_identity_code = self.identity_encoder(transfer_images)
-        transfer_makeup_code = self.makeup_encoder(transfer_images)
+        # cycle consistency
+        cycle_source, cycle_reference = self.generator([result_source, result_reference])
+
+        # Loss Function
+        pred = {"transfer_images" : [result_source, result_reference],
+                "cycle_consistency" : [cycle_source, cycle_reference]
+        }
+
+        # Model
+        model = tf.keras.Model(inputs = [image1, image2], outputs = pred)
+        model.summary()
+        return model
+
+    @tf.function
+    def train_step(self, features, labels):
+        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+            pred = self.model(features, training=True)
+            real_output = self.discriminator(features["images2"], training=True)
+            fake_output1 = self.discriminator(pred["fake_images"], training=True)
+            fake_output2 = self.discriminator(pred["transfer_images"], training=True)
+
+            gen_loss, loss_list = self.loss_function(pred, labels, [fake_output1, fake_output2])
+            dis_loss = Discriminator_loss(real_output, [fake_output1, fake_output2])
+
+        gradients_of_generator = gen_tape.gradient(gen_loss, self.model.trainable_variables)
+        gradients_of_discriminator = disc_tape.gradient(dis_loss, self.discriminator.trainable_variables)
+
+        self.model_optimizer.apply_gradients(zip(gradients_of_generator, self.model.trainable_variables))
+        self.discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, self.discriminator.trainable_variables))
+        return gen_loss, dis_loss, pred["transfer_images"], loss_list
+
+    def train(self, train_dataset, epochs = 500, pretrained_model_path = None):
+        os.makedirs(self.logs_path, exist_ok = True)
+        os.makedirs(self.model_path, exist_ok = True)
+        os.makedirs(self.pic_save_path, exist_ok = True)
+        os.makedirs(self.gt_save_path, exist_ok = True)
+
+        # Load dataset
+        train_step = len(train_dataset) // self.batch_size
+        dataset = train_dataset.flow()
+
+        # Load Pretrain Model
+        if(pretrained_model_path != None):
+            self.load_model(self.model, pretrained_model_path)
+
+        print("[Model BeautyGAN] Training....")
+
+        # Log Scalars
+        logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+        file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+        file_writer.set_as_default()
+
+        for epoch in range(epochs):
+            step = 0
+            for batch_features, batch_labels in dataset:
+                gen_loss, dis_loss, transfer_images, loss_list = self.train_step(batch_features, batch_labels)
+
+                step += 1
+                if(step % 10 == 0):
+                    print ('epoch {0:04d} : gen loss : {1:.6f}, dis loss : {2:.6f}'.format(epoch + 1, gen_loss.numpy(), dis_loss.numpy()))
+                    print('rec : {:.3f}, per : {:.3f}, makeup : {:.3f}, IMRL : {:.3f}, attenton : {:.3f}, adversarial : {:.3f}, kl : {:.3f}, tv : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy(), loss_list[5].numpy(), loss_list[6].numpy(), loss_list[7].numpy()))
+                if(step % 200 == 0):
+                    save_images(epoch + 1, step, batch_features["images1"].numpy(), transfer_images.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
+                    save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
+                if(step == train_step):
+                    break
+            if (epoch + 1) % 5 == 0:
+                model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
+                self.save_model(self.model, model_path)
+            tf.summary.scalar('Epoch', epoch +1)
+            tf.summary.scalar('Generator Loss', gen_loss.numpy())
+            tf.summary.scalar('Discriminator Loss', dis_loss.numpy())
+            tf.summary.scalar('Reconstruction Loss', loss_list[0].numpy())
+            tf.summary.scalar('Perceptual Loss', loss_list[1].numpy())
+            tf.summary.scalar('Makeup Loss', loss_list[2].numpy())
+            tf.summary.scalar('IMRL Loss', loss_list[3].numpy())
+            tf.summary.scalar('Attention Loss', loss_list[4].numpy())
+            tf.summary.scalar('Adversarial Loss', loss_list[5].numpy())
+            tf.summary.scalar('KL Loss', loss_list[6].numpy())
+            tf.summary.scalar('Total Variation Loss', loss_list[7].numpy())
+
+    def export_model(self, save_model_path, export_path):
+        print("[Model BeautyGAN] Exporting Model....")
+        self.load_model(self.model, save_model_path)
+
+        # Makeup Encoder
+        model_path = os.path.join(export_path, 'MakeupEncoder.h5')
+    
+        h, w, c = self.input_shape
+        image2 = tf.keras.layers.Input(self.input_shape, name = "images2")
+        makeup_code2 = self.makeup_encoder(image2)
+        context_code2 = self.context_encoder(makeup_code2)
+
+        MakeupEncoder = tf.keras.Model(inputs = image2, outputs = context_code2)
+        MakeupEncoder.save(model_path)
+
+        # Generator
+        model_path = os.path.join(export_path, 'Generator.h5')
+
+        image1 = tf.keras.layers.Input(self.input_shape, name = "images1")
+        context_code1 = tf.keras.layers.Input((8, ), name = "context_code1") 
+        context_code2 = tf.keras.layers.Input((8, ), name = "context_code2")
+
+        identity_code = self.identity_encoder(image1)
+        transfer_images, transfer_mask = self.generator([identity_code, context_code1, context_code2])
+        transfer_images = transfer_mask * transfer_images + (1 - transfer_mask) * image1
+    
+        Generator = tf.keras.Model(inputs = [image1, context_code1, context_code2], outputs = transfer_images)
+        Generator.save(model_path)
+
+    def save_model(self, model, model_path):
+        model.save_weights(model_path)
+        print('[Model BeautyGAN] Save weights to {}.'.format(model_path))
+        result_source, result_reference = self.generator([image1, image2])
 
         # fake imag
         batch_size = tf.shape(identity_code)[0]

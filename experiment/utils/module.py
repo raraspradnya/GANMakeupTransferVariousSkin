@@ -13,6 +13,13 @@ def Conv2D_layer(x, filters, kernel_size, *args, **kwargs):
     x = tf.keras.layers.Conv2D(filters = filters, kernel_size = kernel_size, *args, **default_kwargs)(x)
     return x
 
+def DeConv2D_layer(x, filters, kernel_size, *args, **kwargs):
+    default_kwargs = {'strides' : (1, 1), 'kernel_regularizer': kernel_reg, 'padding' : 'same', 'kernel_initializer' : tf.keras.initializers.he_normal()}
+    default_kwargs.update(kwargs)
+
+    x = tf.keras.layers.Conv2DTranspose(filters = filters, kernel_size = kernel_size, *args, **default_kwargs)(x)
+    return x
+
 def Dilated_layer(x, filters, kernel_size, dilation, *args, **kwargs):
     default_kwargs = {'strides' : (1, 1), 'kernel_regularizer': kernel_reg, 'padding' : 'same', 'kernel_initializer' : tf.keras.initializers.he_normal()}
     default_kwargs.update(kwargs)
