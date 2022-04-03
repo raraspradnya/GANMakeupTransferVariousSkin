@@ -1,7 +1,7 @@
 import cv2
 import dlib
 import numpy as np
-PREDICTOR_PATH = '../model/shape_predictor_68_face_landmarks.dat'
+PREDICTOR_PATH = '../pretrain_model/shape_predictor_68_face_landmarks.dat'
 predictor = dlib.shape_predictor(PREDICTOR_PATH)
 
 ## Face detection

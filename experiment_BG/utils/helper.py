@@ -158,18 +158,17 @@ def eye_regions_func(mask):
     horizontal = horizontal_n * horizontal_r
     return (vertical * horizontal)
 
-def log(epoch, gen_loss, dis_loss, loss_list):
+@tf.function
+def log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list):
     logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     file_writer = tf.summary.create_file_writer(logdir + "/metrics")
     file_writer.set_as_default()
     tf.summary.scalar('Epoch', epoch +1, step=epoch)
     tf.summary.scalar('Generator Loss', gen_loss.numpy(), step=epoch)
-    tf.summary.scalar('Discriminator Loss', dis_loss.numpy(), step=epoch)
-    tf.summary.scalar('Reconstruction Loss', loss_list[0].numpy(), step=epoch)
-    tf.summary.scalar('Perceptual Loss', loss_list[1].numpy(), step=epoch)
-    tf.summary.scalar('Makeup Loss', loss_list[2].numpy(), step=epoch)
-    tf.summary.scalar('IMRL Loss', loss_list[3].numpy(), step=epoch)
+    tf.summary.scalar('Discriminator X Loss', dis_loss_X.numpy(), step=epoch)
+    tf.summary.scalar('Discriminator Y Loss', dis_loss_Y.numpy(), step=epoch)
+    tf.summary.scalar('Adversarial Loss', loss_list[0].numpy(), step=epoch)
+    tf.summary.scalar('Cycle Consistency Loss', loss_list[1].numpy(), step=epoch)
+    tf.summary.scalar('Perceptual Loss', loss_list[2].numpy(), step=epoch)
+    tf.summary.scalar('Makeup Loss', loss_list[3].numpy(), step=epoch)
     tf.summary.scalar('Attention Loss', loss_list[4].numpy(), step=epoch)
-    tf.summary.scalar('Adversarial Loss', loss_list[5].numpy(), step=epoch)
-    tf.summary.scalar('KL Loss', loss_list[6].numpy(), step=epoch)
-    tf.summary.scalar('Total Variation Loss', loss_list[7].numpy(), step=epoch)

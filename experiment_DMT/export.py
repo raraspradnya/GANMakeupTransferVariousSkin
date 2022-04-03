@@ -5,7 +5,7 @@ from train import params
 from utils.model import NNModel
 
 save_model_path = "logs\\02\\checkpoint\\0040.ckpt"
-export_path = "export\\"
+export_path = "..export\\DMT"
 
 if __name__ == "__main__":
     os.makedirs(export_path, exist_ok = True)
