@@ -161,10 +161,12 @@ class Dataset(object):
         # processing makeup mask
         makeup_mask1 = tf.abs(1.0 -masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
         makeup_mask1 = tf.clip_by_value(tf.cast(makeup_mask1, dtype = tf.float32), 0, 1)
+        background_mask1 = tf.abs(masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
+        background_mask1 = tf.clip_by_value(tf.cast(background_mask1, dtype = tf.float32), 0, 1)
 
         # return data
         data = {'images1' : images1, 'images2' : images2}
-        labels = {'images1' : images1, 'images2' : images2, 'makeup_mask' : makeup_mask1,
+        labels = {'images1' : images1, 'images2' : images2, 'background_mask1' : background_mask1, 'makeup_mask' : makeup_mask1,
                 'face_true' : makeup_true[0], 'brow_true' : makeup_true[1], 'eye_true' : makeup_true[2], 'lip_true' : makeup_true[3],
                 'face_mask' : makeup_masks[0], 'brow_mask' : makeup_masks[1], 'eye_mask' : makeup_masks[2], 'lip_mask' : makeup_masks[3],
                 }

@@ -19,6 +19,8 @@ class Model_DRN(object):
         self.model_path = os.path.join(self.logs_path, 'checkpoint')
         self.pic_save_path = os.path.join(logs_path, 'save_pic')
         self.gt_save_path = os.path.join(logs_path, 'save_gt')
+        self.bg_save_path = os.path.join(logs_path, 'save_bg')
+        self.loss_save_path = os.path.join(logs_path, 'scalars')
 
         # Define optimizer
         learning_rate_fn_1 = tf.keras.optimizers.schedules.PolynomialDecay(2e-4, 155250, 1e-6, power=1.0)
@@ -44,8 +46,8 @@ class Model_DRN(object):
     def loss_function(self, pred, labels, dis_result):
         # Get labels
         source_image, reference_image = labels["images1"], labels["images2"]
+        background_mask1 = labels["background_mask1"]
         face_true, brow_true, eye_true, lip_true = labels["face_true"], labels["brow_true"], labels["eye_true"], labels["lip_true"]
-        makeup_mask = labels["makeup_mask"]
         face_mask, brow_mask, eye_mask, lip_mask = labels["face_mask"], labels["brow_mask"], labels["eye_mask"], labels["lip_mask"]
     
         # Get predicted images
@@ -78,15 +80,14 @@ class Model_DRN(object):
         # Makeup loss
         makeup_loss = Makeup_loss(y_true = [face_true, brow_true, eye_true, lip_true], y_pred_image = transfer_image, y_mask = [face_mask, brow_mask, eye_mask, lip_mask], classes = self.classes)
 
-        # Attention loss
-        non_makeup_mask = 1 - makeup_mask
-        source_non_makeup = source_image * non_makeup_mask
-        transfer_non_makeup = transfer_image * non_makeup_mask
-        attention_loss = Attention_loss(source_non_makeup, transfer_non_makeup)
+        # Background loss
+        source_background = source_image * background_mask1
+        transfer_background = transfer_image * background_mask1
+        attention_loss = Attention_loss(source_background, transfer_background)
         attention_loss = attention_loss * 10
 
         loss = adversarial_loss + cycle_consistency_loss + perceptual_loss + makeup_loss + attention_loss
-        return loss, [adversarial_loss, cycle_consistency_loss, perceptual_loss, makeup_loss, attention_loss]
+        return loss, [adversarial_loss, cycle_consistency_loss, perceptual_loss, makeup_loss, attention_loss], [source_background, transfer_background]
 
 
     def build_generator(self):
@@ -214,7 +215,7 @@ class Model_DRN(object):
             real_reference = self.discriminator_Y(features["images2"], training=True)
             fake_reference = self.discriminator_Y(pred["image"][1], training=True)
 
-            gen_loss, loss_list = self.loss_function(pred, labels, [fake_source, fake_reference])
+            gen_loss, loss_list, bg_images = self.loss_function(pred, labels, [fake_source, fake_reference])
             dis_loss_X = Adversarial_loss_D(real_source, fake_source)
             dis_loss_Y = Adversarial_loss_D(real_reference, fake_reference) 
 
@@ -225,45 +226,48 @@ class Model_DRN(object):
         self.model_optimizer.apply_gradients(zip(gradients_of_generator, self.model.trainable_variables))
         self.discriminatorX_optimizer.apply_gradients(zip(gradients_of_discriminator_X, self.discriminator_X.trainable_variables))
         self.discriminatorY_optimizer.apply_gradients(zip(gradients_of_discriminator_Y, self.discriminator_Y.trainable_variables))
-        return gen_loss, dis_loss_X, dis_loss_Y, pred["image"][0], loss_list
+        return gen_loss, dis_loss_X, dis_loss_Y, pred["image"][0], bg_images, loss_list
 
     def train(self, train_dataset, epochs = 500, pretrained_model_path = None):
         os.makedirs(self.logs_path, exist_ok = True)
         os.makedirs(self.model_path, exist_ok = True)
         os.makedirs(self.pic_save_path, exist_ok = True)
         os.makedirs(self.gt_save_path, exist_ok = True)
+        os.makedirs(self.bg_save_path, exist_ok = True)
+        os.makedirs(self.loss_save_path, exist_ok = True)
 
         # Load dataset
         train_step = len(train_dataset) // self.batch_size
         dataset = train_dataset.flow()
 
+        current_epoch = 0
         # Load Pretrain Model
         if(pretrained_model_path != None):
-            self.load_model(self.model, pretrained_model_path)
+            current_epoch = self.load_model(self.model, pretrained_model_path)
 
         print("[Model DRN] Training....")
 
         for epoch in range(epochs):
             step = 0
+            epoch_num = epoch + 1 + current_epoch
             for batch_features, batch_labels in dataset:
-                # print(batch_features)
 
-                gen_loss, dis_loss_X, dis_loss_Y, transfer_image, loss_list = self.train_step(batch_features, batch_labels)
-
+                gen_loss, dis_loss_X, dis_loss_Y, transfer_image, bg_images, loss_list = self.train_step(batch_features, batch_labels)
                 step += 1
                 if(step % 10 == 0):
-                    print('step : {0:04d}'.format(step))
-                    print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch + 1, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
+                    print('epoch : {0:04d}, step : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch_num, step, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, attention : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
                 if(step % 200 == 0):
-                    save_images(epoch + 1, step, batch_features["images1"].numpy(), transfer_image.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
-                    save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
+                    log(step, gen_loss, dis_loss_X, dis_loss_Y, loss_list, self.loss_save_path)
+                    save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
+                    save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[0].numpy(), bg_images[1].numpy(), self.bg_save_path)
+                    save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step == train_step):
                     break
-            # if (epoch + 1) % 5 == 0:
-            model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
+            model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch_num))
             self.save_model(self.model, model_path)
-            # log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list, self.logs_path)
+            print('END OF epoch')
+            print()
 
 
     def export_model(self, save_model_path, export_path):
@@ -288,4 +292,6 @@ class Model_DRN(object):
 
     def load_model(self, model, model_path):
         model.load_weights(model_path)
+        current_epoch = int(model_path[23:-5])
         print('[Model DRN] Load weights from {}.'.format(model_path))
+        return current_epoch
