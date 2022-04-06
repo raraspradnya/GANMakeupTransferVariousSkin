@@ -62,13 +62,15 @@ def vis_parsing_maps(im, parsing_anno, stride, save_im=False, save_path='facepar
 
     im = np.array(im)
     parsing_anno = np.array(parsing_anno)
+    
+    im = cv2.resize(im, (256, 256), interpolation = cv2.INTER_AREA)
+    parsing_anno= cv2.resize(parsing_anno, (256, 256), interpolation = cv2.INTER_AREA)
     print(im.shape, parsing_anno.shape)
+
     vis_im = im.copy().astype(np.uint8)
     vis_parsing_anno = parsing_anno.copy().astype(np.uint8)
     vis_parsing_anno = cv2.resize(vis_parsing_anno, None, fx=stride, fy=stride, interpolation=cv2.INTER_NEAREST)
     seg = Image.fromarray(vis_parsing_anno, 'L')
-    plt.imshow(seg)
-    plt.show()
 
     vis_parsing_anno_color = np.zeros((vis_parsing_anno.shape[0], vis_parsing_anno.shape[1], 3)) + 255
 

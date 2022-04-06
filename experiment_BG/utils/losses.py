@@ -30,16 +30,16 @@ def Makeup_loss(y_true, y_pred_image, y_mask, classes):
     face_mask, brow_mask, eye_mask, lip_mask = y_mask
     
     y_pred_face = y_pred_image * face_mask
-    face_loss = tf.reduce_mean((y_true_face - y_pred_face) ** 2)
+    face_loss = tf.reduce_mean((y_true_face - y_pred_face) ** 2) * 10
 
     y_pred_brow = y_pred_image * brow_mask
-    brow_loss = tf.reduce_mean((y_true_brow - y_pred_brow) ** 2) * 20
+    brow_loss = tf.reduce_mean((y_true_brow - y_pred_brow) ** 2) * 10
 
     y_pred_eye = y_pred_image * eye_mask
-    eye_loss = tf.reduce_mean((y_true_eye - y_pred_eye) ** 2) * 10
+    eye_loss = tf.reduce_mean((y_true_eye - y_pred_eye) ** 2) * 20
 
     y_pred_lip = y_pred_image * lip_mask
-    lip_loss = tf.reduce_mean((y_true_lip - y_pred_lip) ** 2) * 10
+    lip_loss = tf.reduce_mean((y_true_lip - y_pred_lip) ** 2) * 20
     return (face_loss + brow_loss + eye_loss + lip_loss)
 
 @tf.function

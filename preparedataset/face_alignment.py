@@ -8,6 +8,7 @@ import numpy as np
 import os
 from PIL import Image
 import mediapipe as mp
+from groundtruth.face_parsing import vis_parsing_maps
 
 # https://github.com/serengil/tensorflow-101/blob/master/python/face-alignment.py
 def euclidean_distance(a, b):
@@ -277,13 +278,9 @@ def estimate_pose(img_path):
 
 # test_set = ["D:/# Raras/src/data/coba\\1003.jpg"]
 test_set = []
-for (path, dirnames, filenames) in os.walk('D:/# Raras/src/makeup_dataset/all/images/non-makeup'):
+for (path, dirnames, filenames) in os.walk('D:/# Raras/src/makeup_dataset/all/images/makeup'):
     test_set.extend(os.path.join(path, name) for name in filenames)
 
-# print(test_set)
-x_A= []
-y_A = []
-count = 0
 for instance in test_set:
     if (os.path.exists(instance.strip())):
         img_name= instance[51:]
@@ -292,44 +289,44 @@ for instance in test_set:
         print(pose)
 
         if (pose == "Forward"):
-            try:
-                alignedFace, check = alignFace(instance)
-                if (check == 1):
-                    plt.imshow(alignedFace[:, :, ::-1])
-                    # plt.show()
-                    try:
-                        img, gray_img, checka = detectFace(alignedFace, 0.75)
-                    except:
-                        print(img_name + " is error")
+            # try:
+            #     alignedFace, check = alignFace(instance)
+            #     if (check == 1):
+            #         plt.imshow(alignedFace[:, :, ::-1])
+            #         # plt.show()
+            #         try:
+            #             img, gray_img, checka = detectFace(alignedFace, 0.75)
+            #         except:
+            #             print(img_name + " is error")
 
-                    img = expand2square(img[:, :, ::-1], (0,0,0))
+            #         img = expand2square(img[:, :, ::-1], (0,0,0))
                     
-                    # plt.show()
-                    img_path = "D:/# Raras/src/makeup_dataset/final/no_makeup/" + str(img_name)
-                    # plt.imshow(img)
-                    # plt.show()
-                    img.save(img_path)
-                    seg_path = 'D:/# Raras/src/makeup_dataset/all/segs/non-makeup/' + str(img_name)
-                    seg = cv2.imread(seg_path)
-                    seg_gray = cv2.cvtColor(seg, cv2.COLOR_BGR2GRAY)
-                    seg_img = Image.fromarray(seg_gray, 'L')
-                    # plt.imshow(seg_img)
-                    # plt.show()
-                    seg_path_save = "D:/# Raras/src/makeup_dataset/final/no_makeup_segs/" + str(img_name)
-                    seg_img.save(seg_path_save)
-                else:
-                    print("No face Detectedd")
-            except:
-                img = Image.open(instance)
-                img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
-                img.save(img_path)
-                # print("gagal 1")
-        else:
-            img = Image.open(instance)
-            img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
+            # plt.show()
+            img = cv2.imread(instance)
+            img_path = "D:/# Raras/src/makeup_dataset/final2/makeup/" + str(img_name)
             img.save(img_path)
+            seg_path = 'D:/# Raras/src/makeup_dataset/all/segs/makeup/' + str(img_name)
+            seg = cv2.imread(seg_path)
+            seg_gray = cv2.cvtColor(seg, cv2.COLOR_BGR2GRAY)
+            seg_img = Image.fromarray(seg_gray, 'L')
+            vis_parsing_maps(img, seg_img, stride=1, save_im=True, save_path='C:/Users/RYZEN 9/Documents/GitHub/TA/faceparsing/res/test_res/seg1.jpg')
+            seg_path_save = "D:/# Raras/src/makeup_dataset/final/makeup_segs/" + str(img_name)
+            seg_img.save(seg_path_save)
+            cv2.imshow("img", img)
+            cv2.waitKey(0)
+                # else:
+                #     print("No face Detectedd")
+            # except:
+            #     img = Image.open(instance)
+            #     img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
+            #     img.save(img_path)
+            #     # print("gagal 1")
+        else:
+            # img = Image.open(instance)
+            # img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
+            # img.save(img_path)
             # print("gagal 2")
-        count +=1
+            pass
     else:
         print("file not found")
 

@@ -2,6 +2,7 @@ import os
 import cv2
 import shutil
 import threading
+from numpy import source
 import tensorflow as tf
 from datetime import datetime
 
@@ -95,32 +96,32 @@ class Model_DRN(object):
 
         # DOWNSAMPLING BRANCH
         # SOURCE BRANCH
-        x = Conv2D_layer(image_source, filters = 64, kernel_size = (7, 7))
-        x = ReLU_layer(x)
+        source = Conv2D_layer(image_source, filters = 64, kernel_size = (7, 7))
+        source = ReLU_layer(source)
 
         # REFERENCE BRANCH
-        y = Conv2D_layer(image_reference, filters = 64, kernel_size = (7, 7))
-        y = ReLU_layer(y)
+        reference = Conv2D_layer(image_reference, filters = 64, kernel_size = (7, 7))
+        reference = ReLU_layer(reference)
 
         # CONCATENATE
-        x = Concatenate_layer(x, y, axis = 3)
+        x = Concatenate_layer(source, reference, axis = 3)
 
         # DOWNSAMPLING
         x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3))
         x = ReLU_layer(x)
-        x = Dropout_layer(x, 0.2)
+        x = Dropout_layer(x, rate=0.2)
         x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3))
 
         # DILATED RESIDUAL BLOCK - 1 
         x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 2)
         x = ReLU_layer(x)
-        x = Dropout_layer(x, 0.2)
+        x = Dropout_layer(x, rate=0.2)
         x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 2)
 
         # DILATED RESIDUAL BLOCK - 2
         x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 4)
         x = ReLU_layer(x)
-        x = Dropout_layer(x, 0.2)
+        x = Dropout_layer(x, rate=0.2)
         x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 4)
 
         # DILATED RESIDUAL BLOCK - 3
@@ -129,9 +130,13 @@ class Model_DRN(object):
 
         # OUTPUT
         res_source = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_source = ReLU_layer(res_source)
+        res_source = Conv2D_layer(res_source, filters = 3, kernel_size = (7, 7))
         res_source = tf.nn.tanh(res_source)
 
         res_reference = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_reference = ReLU_layer(res_reference)
+        res_reference = Conv2D_layer(res_reference, filters = 3, kernel_size = (7, 7))
         res_reference = tf.nn.tanh(res_reference)
 
         model = tf.keras.Model(inputs = [image_source, image_reference], outputs = [res_source, res_reference])
@@ -238,14 +243,10 @@ class Model_DRN(object):
 
         print("[Model DRN] Training....")
 
-        # Log Scalars
-        logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-        file_writer = tf.summary.create_file_writer(logdir + "/metrics")
-        file_writer.set_as_default()
-
         for epoch in range(epochs):
             step = 0
             for batch_features, batch_labels in dataset:
+                # print(batch_features)
 
                 gen_loss, dis_loss_X, dis_loss_Y, transfer_image, loss_list = self.train_step(batch_features, batch_labels)
 
@@ -262,7 +263,7 @@ class Model_DRN(object):
             # if (epoch + 1) % 5 == 0:
             model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
             self.save_model(self.model, model_path)
-            log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list)
+            # log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list, self.logs_path)
 
 
     def export_model(self, save_model_path, export_path):

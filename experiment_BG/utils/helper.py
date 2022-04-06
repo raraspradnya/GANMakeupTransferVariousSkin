@@ -38,6 +38,7 @@ def save_images(epoch, step, origin_images, pred_images, reference_images, pic_s
 
         pos += 3
     save_path = os.path.join(pic_save_path, 'image_at_epoch_{:04d}_{:04d}.png'.format(epoch, step))
+    save_path = os.path.normpath(save_path)
     plt.savefig(save_path)
     plt.clf()
 
@@ -111,15 +112,6 @@ def warping(source, reference):
     source = np.array(source, dtype = np.uint8)
     reference = np.array(reference, dtype = np.uint8)
 
-    # # Using the file writer, log the reshaped image.
-    # logdir = "logs/images/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-    # # Creates a file writer for the log directory.
-    # file_writer = tf.summary.create_file_writer(logdir)
-    # with file_writer.as_default():
-    #     tf.summary.image("image ref", reference, step=0)
-    #     tf.summary.image("image source", source, step=0)
-
-    # get the set of unique pixel values and their corresponding indices and
     # counts
     result = np.zeros(oldshape, dtype = np.uint8)
     for i in range(batch_size):
@@ -127,7 +119,7 @@ def warping(source, reference):
         r = reference[i]
         ref_points, ref_shape, ref_face, check = select_face(r)
         if (check ==  0):
-            return result
+            return source
         src_faceBoxes = select_all_faces(s)
         output = s
         for k, src_face in src_faceBoxes.items():
@@ -159,9 +151,10 @@ def eye_regions_func(mask):
     return (vertical * horizontal)
 
 @tf.function
-def log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list):
-    logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-    file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+def log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list, log_path):
+    file_path = "/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    save_path = os.path.join(log_path, file_path)
+    file_writer = tf.summary.create_file_writer(save_path + "/metrics")
     file_writer.set_as_default()
     tf.summary.scalar('Epoch', epoch +1, step=epoch)
     tf.summary.scalar('Generator Loss', gen_loss.numpy(), step=epoch)

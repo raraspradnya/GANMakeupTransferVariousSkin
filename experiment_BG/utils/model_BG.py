@@ -131,24 +131,27 @@ class Model_BG(object):
         x = DeConv2D_layer(x, filters = 64, kernel_size = (4, 4), strides=(2, 2))
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
+        x = DeConv2D_layer(x, filters = 32, kernel_size = (4, 4), strides=(2, 2))
+        x = InstanceNormalization_layer(x)
+        x = ReLU_layer(x)
 
         # UPSAMPLING BRANCH
         res_source = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
         res_source = InstanceNormalization_layer(res_source)
         res_source = ReLU_layer(res_source)
-        res_source = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_source = Conv2D_layer(res_source, filters = 64, kernel_size = (3, 3))
         res_source = InstanceNormalization_layer(res_source)
         res_source = ReLU_layer(res_source)
-        res_source = Conv2D_layer(x, filters = 3, kernel_size = (7, 7))
+        res_source = Conv2D_layer(res_source, filters = 3, kernel_size = (7, 7))
         res_source = tf.nn.tanh(res_source)
 
         res_reference = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
         res_reference = InstanceNormalization_layer(res_reference)
         res_reference = ReLU_layer(res_reference)
-        res_reference = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_reference = Conv2D_layer(res_reference, filters = 64, kernel_size = (3, 3))
         res_reference = InstanceNormalization_layer(res_reference)
         res_reference = ReLU_layer(res_reference)
-        res_reference = Conv2D_layer(x, filters = 3, kernel_size = (7, 7))
+        res_reference = Conv2D_layer(res_reference, filters = 3, kernel_size = (7, 7))
         res_reference = tf.nn.tanh(res_reference)
 
         model = tf.keras.Model(inputs = [image_source, image_reference], outputs = [res_source, res_reference])
@@ -268,6 +271,7 @@ class Model_BG(object):
 
                 step += 1
                 if(step % 10 == 0):
+                    # log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list)
                     print('step : {0:04d}'.format(step))
                     print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch + 1, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, attention : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
@@ -275,12 +279,11 @@ class Model_BG(object):
                     save_images(epoch + 1, step, batch_features["images1"].numpy(), transfer_image.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
                     save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step == train_step):
+                    # log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list)
                     break
             # if (epoch + 1) % 5 == 0:
             model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
             self.save_model(self.model, model_path)
-            log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list)
-
 
     def export_model(self, save_model_path, export_path):
         print("[Model BeautyGAN] Exporting Model....")

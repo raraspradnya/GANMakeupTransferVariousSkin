@@ -67,7 +67,7 @@ def Concatenate_layer(x, y, axis, *args, **kwargs):
 def Dropout_layer(x, rate, *args, **kwargs):
     default_kwargs = {"rate" : 0.2}
     default_kwargs.update(kwargs)
-    x = tf.keras.layers.Dropout(x, rate)
+    x = tf.keras.layers.Dropout(rate=rate)(x)
     return x
 
 def AdaInstanceNormalization_layer(content, style, epsilon=1e-5):
