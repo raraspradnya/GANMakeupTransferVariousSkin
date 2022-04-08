@@ -50,6 +50,6 @@ def Total_Variation_loss(feature):
     return TV_loss
 
 @tf.function
-def Attention_loss(y_true, y_pred):
+def Background_loss(y_true, y_pred):
     loss = tf.reduce_mean((y_true - y_pred) ** 2)
     return loss

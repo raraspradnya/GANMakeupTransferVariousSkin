@@ -5,6 +5,7 @@ import threading
 from numpy import source
 import tensorflow as tf
 from datetime import datetime
+import pandas as pd
 
 from utils.module import *
 from utils.losses import *
@@ -20,7 +21,7 @@ class Model_DRN(object):
         self.pic_save_path = os.path.join(logs_path, 'save_pic')
         self.gt_save_path = os.path.join(logs_path, 'save_gt')
         self.bg_save_path = os.path.join(logs_path, 'save_bg')
-        self.loss_save_path = os.path.join(logs_path, 'scalars')
+        self.loss_save_path = os.path.join(logs_path, 'metrics')
 
         # Define optimizer
         learning_rate_fn_1 = tf.keras.optimizers.schedules.PolynomialDecay(2e-4, 155250, 1e-6, power=1.0)
@@ -83,11 +84,11 @@ class Model_DRN(object):
         # Background loss
         source_background = source_image * background_mask1
         transfer_background = transfer_image * background_mask1
-        attention_loss = Attention_loss(source_background, transfer_background)
-        attention_loss = attention_loss * 10
+        background_loss = Background_loss(source_background, transfer_background)
+        background_loss = background_loss * 10
 
-        loss = adversarial_loss + cycle_consistency_loss + perceptual_loss + makeup_loss + attention_loss
-        return loss, [adversarial_loss, cycle_consistency_loss, perceptual_loss, makeup_loss, attention_loss], [source_background, transfer_background]
+        loss = adversarial_loss + cycle_consistency_loss + perceptual_loss + makeup_loss + background_loss
+        return loss, [adversarial_loss, cycle_consistency_loss, perceptual_loss, makeup_loss, background_loss], [source_background, transfer_background]
 
 
     def build_generator(self):
@@ -255,10 +256,10 @@ class Model_DRN(object):
                 gen_loss, dis_loss_X, dis_loss_Y, transfer_image, bg_images, loss_list = self.train_step(batch_features, batch_labels)
                 step += 1
                 if(step % 10 == 0):
-                    print('epoch : {0:04d}, step : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch_num, step, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
-                    print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, attention : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
+                    print("step : {:d}".format(step))
+                    print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch_num, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
+                    print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
                 if(step % 200 == 0):
-                    log(step, gen_loss, dis_loss_X, dis_loss_Y, loss_list, self.loss_save_path)
                     save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
                     save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[0].numpy(), bg_images[1].numpy(), self.bg_save_path)
                     save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
@@ -266,8 +267,7 @@ class Model_DRN(object):
                     break
             model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch_num))
             self.save_model(self.model, model_path)
-            print('END OF epoch')
-            print()
+            log(epoch_num, gen_loss, dis_loss_X, dis_loss_Y, loss_list, self.loss_save_path)
 
 
     def export_model(self, save_model_path, export_path):

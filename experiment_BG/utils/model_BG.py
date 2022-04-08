@@ -77,15 +77,15 @@ class Model_BG(object):
         # Makeup loss
         makeup_loss = Makeup_loss(y_true = [face_true, brow_true, eye_true, lip_true], y_pred_image = transfer_image, y_mask = [face_mask, brow_mask, eye_mask, lip_mask], classes = self.classes)
 
-        # Attention loss
+        # Background loss
         non_makeup_mask = 1-makeup_mask
         source_non_makeup = source_image * non_makeup_mask
         transfer_non_makeup = transfer_image * non_makeup_mask
-        attention_loss = Attention_loss(source_non_makeup, transfer_non_makeup)
-        attention_loss = attention_loss * 10
+        background_loss = Background_loss(source_non_makeup, transfer_non_makeup)
+        background_loss = background_loss * 10
 
-        loss = adversarial_loss + cycle_consistency_loss + perceptual_loss + makeup_loss + attention_loss
-        return loss, [adversarial_loss, cycle_consistency_loss, perceptual_loss, makeup_loss, attention_loss]
+        loss = adversarial_loss + cycle_consistency_loss + perceptual_loss + makeup_loss + background_loss
+        return loss, [adversarial_loss, cycle_consistency_loss, perceptual_loss, makeup_loss, background_loss]
 
 
     def build_generator(self):
@@ -274,7 +274,7 @@ class Model_BG(object):
                     # log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list)
                     print('step : {0:04d}'.format(step))
                     print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch + 1, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
-                    print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, attention : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
+                    print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
                 if(step % 200 == 0):
                     save_images(epoch + 1, step, batch_features["images1"].numpy(), transfer_image.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
                     save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
