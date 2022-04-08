@@ -66,7 +66,7 @@ class Model_DRN(object):
 
         # CYCLE CONSISTENCY loss
         beta = 10
-        cycle_consistency_loss = Cycle_consistency_loss(transfer_image, demakeup_image, cycle_source_image, cycle_reference_image)
+        cycle_consistency_loss = Cycle_consistency_loss(source_image, reference_image, cycle_source_image, cycle_reference_image)
         cycle_consistency_loss = cycle_consistency_loss * beta
 
         # PERCEPTUAL LOSS
@@ -227,7 +227,7 @@ class Model_DRN(object):
         self.model_optimizer.apply_gradients(zip(gradients_of_generator, self.model.trainable_variables))
         self.discriminatorX_optimizer.apply_gradients(zip(gradients_of_discriminator_X, self.discriminator_X.trainable_variables))
         self.discriminatorY_optimizer.apply_gradients(zip(gradients_of_discriminator_Y, self.discriminator_Y.trainable_variables))
-        return gen_loss, dis_loss_X, dis_loss_Y, pred["image"][0], bg_images, loss_list
+        return gen_loss, dis_loss_X, dis_loss_Y, pred["image"], bg_images, loss_list
 
     def train(self, train_dataset, epochs = 500, pretrained_model_path = None):
         os.makedirs(self.logs_path, exist_ok = True)
@@ -260,8 +260,8 @@ class Model_DRN(object):
                     print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch_num, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
                 if(step % 200 == 0):
-                    save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
-                    save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[0].numpy(), bg_images[1].numpy(), self.bg_save_path)
+                    save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_features["images2"].numpy(), self.pic_save_path)
+                    save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[1].numpy(), transfer_image[1].numpy, self.bg_save_path)
                     save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step == train_step):
                     break

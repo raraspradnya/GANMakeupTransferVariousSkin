@@ -5,39 +5,21 @@ import tensorflow_addons as tfa
 
 class FaceBeautyModel(object):
     def __init__(self):
-        self.makeup_model_path = "export\\MakeupEncoder.h5"
-        self.generator_model_path = "export\\Generator.h5"
-
-        self.MakeupEncoder = self.loadMakeupEncoder()
+        self.generator_model_path = "../export_models/DRN/Generator.h5"
         self.Generator = self.loadGenerator()
-        self.MakeupEncoder.compile()
         self.Generator.compile()
 
-        self.image_size = (224, 224)
+        self.image_size = (256, 256)
         pass
-
-    def loadMakeupEncoder(self):
-        return tf.keras.models.load_model(self.makeup_model_path)
 
     def loadGenerator(self):
         return tf.keras.models.load_model(self.generator_model_path, custom_objects = {'InstanceNormalization':tfa.layers.InstanceNormalization})
 
-    def getMakeupCode(self, images):
+    def transfer(self, images, makeup_images, predict_batch  = 10):
         images = self.preprocessingImages(images)
-        makeup_code = self.MakeupEncoder.predict(images)
-        return makeup_code
+        makeup_images = self.preprocessingImages(makeup_images)
 
-    def transfer(self, images, makeup_codes, predict_batch  = 10):
-        images = self.preprocessingImages(images)
-        if(len(images) > len(makeup_codes[0])):
-            makeup_codes[0] = np.repeat(makeup_codes[0], len(images), axis = 0)
-            makeup_codes[1] = np.repeat(makeup_codes[1], len(images), axis = 0)
-        else:
-            makeup_codes[0] = makeup_codes[0][:len(images)]
-            makeup_codes[1] = makeup_codes[1][:len(images)]
-
-
-        transfer_images = self.Generator.predict([images, makeup_codes[0], makeup_codes[1]], batch_size = predict_batch)
+        transfer_images = self.Generator.predict([images, makeup_images], batch_size = predict_batch)
         transfer_images = self.postprocessingImages(transfer_images)
         return transfer_images
 
