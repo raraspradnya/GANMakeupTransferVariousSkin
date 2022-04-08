@@ -53,7 +53,7 @@ class Model_DRN(object):
     
         # Get predicted images
         transfer_image, demakeup_image  = pred["image"][0], pred["image"][1]
-        cycle_source_image, cycle_reference_image  = pred["cycle_image"][0], pred["cycle_image"][1]
+        cycle_reference_image, cycle_source_image  = pred["cycle_image"][0], pred["cycle_image"][1]
         
         # ADVERSARIAL LOSS
         # Get discriminator results
@@ -192,14 +192,14 @@ class Model_DRN(object):
         image2 = tf.keras.layers.Input(self.input_shape, name = "images2") 
 
         # transfer image
-        result_source, result_reference = self.generator([image1, image2])
+        transfer_images, demakeup_images = self.generator([image1, image2])
 
         # cycle consistency
-        cycle_source, cycle_reference = self.generator([result_source, result_reference])
+        cycle_reference, cycle_source  = self.generator([demakeup_images, transfer_images])
 
         # Loss Function
-        pred = {"image" : [result_source, result_reference],
-                "cycle_image" : [cycle_source, cycle_reference]
+        pred = {"image" : [transfer_images, demakeup_images],
+                "cycle_image" : [cycle_reference, cycle_source]
         }
 
         # Model
@@ -261,7 +261,7 @@ class Model_DRN(object):
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
                 if(step % 200 == 0):
                     save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_features["images2"].numpy(), self.pic_save_path)
-                    save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[1].numpy(), transfer_image[1].numpy, self.bg_save_path)
+                    save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[1].numpy(), transfer_image[1].numpy(), self.bg_save_path)
                     save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step == train_step):
                     break
