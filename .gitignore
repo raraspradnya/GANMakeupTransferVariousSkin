@@ -3,3 +3,5 @@
 *.pyc
 data
 dataset
+experiment_BG/Transfer/
+experiment_BG/Transfer_1/

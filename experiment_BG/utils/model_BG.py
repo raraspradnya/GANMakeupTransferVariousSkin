@@ -18,6 +18,8 @@ class Model_BG(object):
         self.model_path = os.path.join(self.logs_path, 'checkpoint')
         self.pic_save_path = os.path.join(logs_path, 'save_pic')
         self.gt_save_path = os.path.join(logs_path, 'save_gt')
+        self.bg_save_path = os.path.join(logs_path, 'save_bg')
+        self.loss_save_path = os.path.join(logs_path, 'metrics')
 
         # Define optimizer
         learning_rate_fn_1 = tf.keras.optimizers.schedules.PolynomialDecay(2e-4, 155250, 1e-6, power=1.0)
@@ -43,13 +45,13 @@ class Model_BG(object):
     def loss_function(self, pred, labels, dis_result):
         # Get labels
         source_image, reference_image = labels["images1"], labels["images2"]
+        background_mask1 = labels["background_mask1"]
         face_true, brow_true, eye_true, lip_true = labels["face_true"], labels["brow_true"], labels["eye_true"], labels["lip_true"]
-        makeup_mask = labels["makeup_mask"]
         face_mask, brow_mask, eye_mask, lip_mask = labels["face_mask"], labels["brow_mask"], labels["eye_mask"], labels["lip_mask"]
     
         # Get predicted images
         transfer_image, demakeup_image  = pred["image"][0], pred["image"][1]
-        cycle_source_image, cycle_reference_image  = pred["cycle_image"][0], pred["cycle_image"][1]
+        cycle_reference_image, cycle_source_image = pred["cycle_image"][0], pred["cycle_image"][1]
         
         # ADVERSARIAL LOSS
         # Get discriminator results
@@ -76,12 +78,12 @@ class Model_BG(object):
 
         # Makeup loss
         makeup_loss = Makeup_loss(y_true = [face_true, brow_true, eye_true, lip_true], y_pred_image = transfer_image, y_mask = [face_mask, brow_mask, eye_mask, lip_mask], classes = self.classes)
+        makeup_loss = makeup_loss * 10
 
         # Background loss
-        non_makeup_mask = 1-makeup_mask
-        source_non_makeup = source_image * non_makeup_mask
-        transfer_non_makeup = transfer_image * non_makeup_mask
-        background_loss = Background_loss(source_non_makeup, transfer_non_makeup)
+        source_background = source_image * background_mask1
+        transfer_background = transfer_image * background_mask1
+        background_loss = Background_loss(source_background, transfer_background)
         background_loss = background_loss * 10
 
         loss = adversarial_loss + cycle_consistency_loss + perceptual_loss + makeup_loss + background_loss
@@ -205,13 +207,13 @@ class Model_BG(object):
         image2 = tf.keras.layers.Input(self.input_shape, name = "images2") 
 
         # transfer image
-        result_source, result_reference = self.generator([image1, image2])
+        transfer_images, demakeup_images = self.generator([image1, image2])
 
         # cycle consistency
-        cycle_source, cycle_reference = self.generator([result_source, result_reference])
+        cycle_reference, cycle_source  = self.generator([demakeup_images, transfer_images])
 
         # Loss Function
-        pred = {"image" : [result_source, result_reference],
+        pred = {"image" : [transfer_images, demakeup_images],
                 "cycle_image" : [cycle_source, cycle_reference]
         }
 
@@ -225,9 +227,9 @@ class Model_BG(object):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tapeX, tf.GradientTape() as disc_tapeY:
             pred = self.model(features, training=True)
             real_source = self.discriminator_X(features["images1"], training=True)
-            fake_source = self.discriminator_X(pred["image"][0], training=True)
+            fake_source = self.discriminator_X(pred["image"][1], training=True)
             real_reference = self.discriminator_Y(features["images2"], training=True)
-            fake_reference = self.discriminator_Y(pred["image"][1], training=True)
+            fake_reference = self.discriminator_Y(pred["image"][0], training=True)
 
             gen_loss, loss_list = self.loss_function(pred, labels, [fake_source, fake_reference])
             dis_loss_X = Adversarial_loss_D(real_source, fake_source)
@@ -247,31 +249,30 @@ class Model_BG(object):
         os.makedirs(self.model_path, exist_ok = True)
         os.makedirs(self.pic_save_path, exist_ok = True)
         os.makedirs(self.gt_save_path, exist_ok = True)
+        os.makedirs(self.bg_save_path, exist_ok = True)
+        os.makedirs(self.loss_save_path, exist_ok = True)
 
         # Load dataset
         train_step = len(train_dataset) // self.batch_size
         dataset = train_dataset.flow()
 
+        current_epoch = 0
+
         # Load Pretrain Model
         if(pretrained_model_path != None):
             self.load_model(self.model, pretrained_model_path)
+            current_epoch = self.load_model(self.model, pretrained_model_path)
 
         print("[Model BeautyGAN] Training....")
 
-        # Log Scalars
-        logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-        file_writer = tf.summary.create_file_writer(logdir + "/metrics")
-        file_writer.set_as_default()
-
         for epoch in range(epochs):
             step = 0
+            epoch_num = epoch + 1 + current_epoch
             for batch_features, batch_labels in dataset:
 
                 gen_loss, dis_loss_X, dis_loss_Y, transfer_image, loss_list = self.train_step(batch_features, batch_labels)
-
                 step += 1
                 if(step % 10 == 0):
-                    # log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list)
                     print('step : {0:04d}'.format(step))
                     print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch + 1, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
@@ -279,11 +280,11 @@ class Model_BG(object):
                     save_images(epoch + 1, step, batch_features["images1"].numpy(), transfer_image.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
                     save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step == train_step):
-                    # log(epoch, gen_loss, dis_loss_X, dis_loss_Y, loss_list)
                     break
-            # if (epoch + 1) % 5 == 0:
             model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
             self.save_model(self.model, model_path)
+            log(epoch_num, gen_loss, dis_loss_X, dis_loss_Y, loss_list, self.loss_save_path)
+
 
     def export_model(self, save_model_path, export_path):
         print("[Model BeautyGAN] Exporting Model....")
@@ -307,4 +308,6 @@ class Model_BG(object):
 
     def load_model(self, model, model_path):
         model.load_weights(model_path)
-        print('[Model BeautyGAN] Load weights from {}.'.format(model_path))
+        current_epoch = int(model_path[23:-5])
+        print('[Model DRN] Load weights from {}.'.format(model_path))
+        return current_epoch

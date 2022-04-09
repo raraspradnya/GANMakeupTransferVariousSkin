@@ -6,7 +6,7 @@ import numpy as np
 
 from API import FaceBeautyModel
 
-output_path = "Transfer"
+output_path = "Transfer_1"
 images_path = "..\\dataset\\RawData\\images\\non-makeup\\*"
 reference_image_path = "..\\dataset\\RawData\\images\\makeup\\*"
 
@@ -53,5 +53,3 @@ if __name__ == "__main__":
         path = os.path.join(output_path, '{}.png'.format(i))
         imres = cv2.hconcat([image[i], makeup_image[i], transfer_images[i], demakeup_images[i]])
         cv2.imwrite(path, imres)
-    
-

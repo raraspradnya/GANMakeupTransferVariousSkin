@@ -80,6 +80,7 @@ class Model_DRN(object):
 
         # Makeup loss
         makeup_loss = Makeup_loss(y_true = [face_true, brow_true, eye_true, lip_true], y_pred_image = transfer_image, y_mask = [face_mask, brow_mask, eye_mask, lip_mask], classes = self.classes)
+        makeup_loss = makeup_loss * 10
 
         # Background loss
         source_background = source_image * background_mask1
