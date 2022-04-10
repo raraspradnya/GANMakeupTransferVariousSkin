@@ -64,7 +64,7 @@ class Model_BG(object):
 
         # CYCLE CONSISTENCY loss
         beta = 10
-        cycle_consistency_loss = Cycle_consistency_loss(transfer_image, demakeup_image, cycle_source_image, cycle_reference_image)
+        cycle_consistency_loss = Cycle_consistency_loss(source_image, reference_image, cycle_source_image, cycle_reference_image)
         cycle_consistency_loss = cycle_consistency_loss * beta
 
         # PERCEPTUAL LOSS

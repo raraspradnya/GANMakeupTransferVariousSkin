@@ -11,8 +11,8 @@ params = {
         "classes" : {"face" : [1, 6, 11, 12, 13], "brow" : [2, 3], "eye" : [2, 3, 4, 5], "eyeball" : [4, 5],  "lip" : [7, 9], "non-makeup" : [0, 4, 5, 8, 10], 
                      "hair" : [10], "whole_face" : [1, 2, 3, 4, 5, 6, 7, 8, 9]},
 
-        "logs_path" : 'logs/BG/02',
-        "pretrained_model_path" : None, #'logs/DRN/06/checkpoint/0003.ckpt',
+        "logs_path" : 'logs/BG/03',
+        "pretrained_model_path" : 'logs/BG/02/checkpoint/0010.ckpt',
 
         "train_dataset_path" : {'source' : r'../dataset/source/Train', 'reference' : r'../dataset/reference/Train'},
         "train_dataset_size" : [779, 1797],
