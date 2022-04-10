@@ -274,7 +274,7 @@ class Model_BG(object):
                 step += 1
                 if(step % 10 == 0):
                     print('step : {0:04d}'.format(step))
-                    print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch + 1, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
+                    print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch_num, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
                 if(step % 200 == 0):
                     save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_features["images2"].numpy(), self.pic_save_path)
@@ -282,7 +282,7 @@ class Model_BG(object):
                     save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step == train_step):
                     break
-            model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
+            model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch_num))
             self.save_model(self.model, model_path)
             log(epoch_num, gen_loss, dis_loss_X, dis_loss_Y, loss_list, self.loss_save_path)
 
@@ -310,5 +310,5 @@ class Model_BG(object):
     def load_model(self, model, model_path):
         model.load_weights(model_path)
         current_epoch = int(model_path[23:-5])
-        print('[Model DRN] Load weights from {}.'.format(model_path))
+        print('[Model BeautyGAN] Load weights from {}.'.format(model_path))
         return current_epoch
