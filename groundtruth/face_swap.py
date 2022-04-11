@@ -162,20 +162,36 @@ def mask_from_points(size, points, erode_flag=0):
     mask_eye = cv2.fillConvexPoly(mask_eye, convexhull_right_eye, 255)
     mask_eye = cv2.fillConvexPoly(mask_eye, convexhull_mouth, 255)
     mask = cv2.bitwise_not(mask)
-    # cv2.imshow("mask", mask)
-    # cv2.imshow("mask1", mask_eye)
-    # cv2.waitKey(0)
     mask = cv2.bitwise_xor(mask, mask_eye)
     mask = cv2.bitwise_not(mask)
-    # cv2.imshow("mask2", mask)
-    # cv2.waitKey(0)
 
     if erode_flag:
         mask = cv2.erode(mask, kernel,iterations=1)
-        # cv2.imshow("mask2", mask)
-        # cv2.waitKey(0)
 
     return mask
+
+def get_lip_mask(size, points, erode_flag=0):
+    radius = 10  # kernel size
+    kernel = np.ones((radius, radius), np.uint8)
+
+    mask = np.zeros(size, np.uint8)
+    cv2.fillConvexPoly(mask, cv2.convexHull(points), 255)
+
+    mask1 = np.zeros_like(mask)
+    lips_points = np.array(points[48:60], np.int32)
+    mouth_points = np.array(points[60:68], np.int32)
+    convexhull_lips = cv2.convexHull(lips_points)
+    convexhull_mouth = cv2.convexHull(mouth_points)
+    
+    mask_lips = cv2.fillConvexPoly(mask1, convexhull_lips, 255)
+    mask_lips = cv2.bitwise_not(mask_lips)
+    mask_lips_no_mouth = cv2.fillConvexPoly(mask_lips, convexhull_mouth, 255)
+    mask_lips_no_mouth = cv2.bitwise_not(mask_lips_no_mouth)
+
+    if erode_flag:
+        mask = cv2.erode(mask, kernel,iterations=1)
+
+    return mask_lips_no_mouth
 
 
 ## Color Correction
@@ -246,27 +262,18 @@ def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, en
     mask_src = np.mean(warped_src_face, axis=2) > 0
     mask = np.asarray(mask * mask_src, dtype=np.uint8)
 
-
-    # ## Correct color
-    # if args.correct_color:
-    #     warped_src_face = apply_mask(warped_src_face, mask)
-    #     dst_face_masked = apply_mask(dst_face, mask)
-    #     warped_src_face = correct_colours(dst_face_masked, warped_src_face, dst_points)
-    # ## 2d warp
-    # if args.warp_2d:
-    #     unwarped_src_face = warp_image_3d(warped_src_face, dst_points[:end], src_points[:end], src_face.shape[:2])
-    #     warped_src_face = warp_image_2d(unwarped_src_face, transformation_from_points(dst_points, src_points),
-    #                                     (h, w, 3))
-
-    #     mask = mask_from_points((h, w), dst_points)
-    #     mask_src = np.mean(warped_src_face, axis=2) > 0
-    #     mask = np.asarray(mask * mask_src, dtype=np.uint8)
+    lip_mask = get_lip_mask((h, w), dst_points)
+    lip_mask_src = np.mean(warped_src_face, axis=2) > 0
+    lip_mask = np.asarray(lip_mask * lip_mask_src, dtype=np.uint8)
 
     ##Poisson Blending
     r = cv2.boundingRect(mask)
     center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
+    lip_r = cv2.boundingRect(lip_mask)
+    lip_center = ((lip_r[0] + int(lip_r[2] / 2), lip_r[1] + int(lip_r[3] / 2)))
     
     output = cv2.seamlessClone(warped_src_face, dst_face, mask, center, cv2.MIXED_CLONE)
+    output = cv2.seamlessClone(warped_src_face, output, lip_mask, lip_center, cv2.NORMAL_CLONE)
 
     x, y, w, h = dst_shape
     dst_img_cp = dst_img.copy()

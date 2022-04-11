@@ -213,9 +213,9 @@ class Model_DRN(object):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tapeX, tf.GradientTape() as disc_tapeY:
             pred = self.model(features, training=True)
             real_source = self.discriminator_X(features["images1"], training=True)
-            fake_source = self.discriminator_X(pred["image"][0], training=True)
+            fake_source = self.discriminator_X(pred["image"][1], training=True)
             real_reference = self.discriminator_Y(features["images2"], training=True)
-            fake_reference = self.discriminator_Y(pred["image"][1], training=True)
+            fake_reference = self.discriminator_Y(pred["image"][0], training=True)
 
             gen_loss, loss_list, bg_images = self.loss_function(pred, labels, [fake_source, fake_reference])
             dis_loss_X = Adversarial_loss_D(real_source, fake_source)
