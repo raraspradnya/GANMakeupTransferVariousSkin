@@ -2,78 +2,26 @@
 import os
 import cv2
 import argparse
+from matplotlib.pyplot import hist, table
 import tensorflow as tf
 import numpy as np
 from skimage.exposure import match_histograms
+import copy
 
 from face_detection import select_face, select_all_faces
 from face_swap import face_swap
 from face_parsing import get_face
 
 def eye_regions_func(mask):
-    vertical = tf.clip_by_value(tf.reduce_sum(mask, axis = 1, keepdims = True), 0, 1)
-    horizontal = tf.clip_by_value(tf.reduce_sum(mask, axis = 2, keepdims = True), 0, 1)
-    vertical_n = tf.clip_by_value(tf.cumsum(vertical, axis = 2), 0, 1)
-    vertical_r = tf.clip_by_value(tf.cumsum(vertical, axis = 2, reverse = True), 0, 1)
-    horizontal_n = tf.clip_by_value(tf.cumsum(horizontal, axis = 1), 0, 1)
-    horizontal_r = tf.clip_by_value(tf.cumsum(horizontal, axis = 1, reverse = True), 0, 1)
+    vertical = tf.clip_by_value(tf.reduce_sum(mask, axis = 0, keepdims = True), 0, 1)
+    horizontal = tf.clip_by_value(tf.reduce_sum(mask, axis = 1, keepdims = True), 0, 1)
+    vertical_n = tf.clip_by_value(tf.cumsum(vertical, axis = 1), 0, 1)
+    vertical_r = tf.clip_by_value(tf.cumsum(vertical, axis = 1, reverse = True), 0, 1)
+    horizontal_n = tf.clip_by_value(tf.cumsum(horizontal, axis = 0), 0, 1)
+    horizontal_r = tf.clip_by_value(tf.cumsum(horizontal, axis = 0, reverse = True), 0, 1)
     vertical = vertical_n * vertical_r
     horizontal = horizontal_n * horizontal_r
     return (vertical * horizontal)
-
-def hist_match_func(source, reference):
-    """
-    Adjust the pixel values of images such that its histogram
-    matches that of a target image
-
-    Arguments:
-    -----------
-        source: np.ndarray
-            Image to transform; the histogram is computed over the flattened
-            array
-        reference: np.ndarray
-            Reference image; can have different dimensions to source
-    Returns:
-    -----------
-        matched: np.ndarray
-            The transformed output image
-    """
-
-    oldshape = source.shape
-    batch_size = oldshape[0]
-    source = np.array(source, dtype = np.uint8)
-    reference = np.array(reference, dtype = np.uint8)
-    # get the set of unique pixel values and their corresponding indices and
-    # counts
-    result = np.zeros(oldshape, dtype = np.uint8)
-        # for c in range(3):
-        #     s = source[i,...,c].ravel()
-        #     r = reference[i,..., c].ravel()
-
-        #     s_values, bin_idx, s_counts = np.unique(s, return_inverse=True, return_counts=True)
-        #     r_values, r_counts = np.unique(r, return_counts=True)
-
-        #     if(len(s_counts) == 1 or len(r_counts) == 1):
-        #         continue
-        #     # take the cumsum of the counts and normalize by the number of pixels to
-        #     # get the empirical cumulative distribution functions for the source and
-        #     # template images (maps pixel value --> quantile)
-        #     s_quantiles = np.cumsum(s_counts[1:]).astype(np.float64)
-        #     s_quantiles /= s_quantiles[-1]
-        #     r_quantiles = np.cumsum(r_counts[1:]).astype(np.float64)
-        #     r_quantiles /= r_quantiles[-1]
-        #     r_values = r_values[1:]
-
-        #     # interpolate linearly to find the pixel values in the template image
-        #     # that correspond most closely to the quantiles in the source image
-        #     interp_value = np.zeros_like(s_values, dtype = np.float32)
-        #     interp_r_values = np.interp(s_quantiles, r_quantiles, r_values)
-        #     interp_value[1:] = interp_r_values
-        #     result[i,...,c] = interp_value[bin_idx].reshape(oldshape[1:3])
-    result = match_histograms(source[i], reference[i], multichannel=True)
-    result = np.array(result, dtype=np.float32)
-    return result
-
 
 def masking_func(mask, classes_list):
     mask = tf.cast(mask, dtype = tf.int32)
@@ -89,11 +37,110 @@ def process_mask(mask):
     mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
     return mask
 
+def cal_trans(ref, adj):
+    """
+        calculate transfer function
+        algorithm refering to wiki item: Histogram matching
+    """
+    table = list(range(0, 256))
+    for i in list(range(1, 256)):
+        for j in list(range(1, 256)):
+            if ref[i] >= adj[j - 1] and ref[i] <= adj[j]:
+                table[i] = j
+                break
+    table[255] = 255
+    return table
+
+def get_histogram(img, img_mask):
+    hists = []
+    img_mask = np.array(img_mask, dtype=np.uint8)
+    for i in range(3):
+        hist = cv2.calcHist([img],[i], img_mask, [256], [0,256])
+        sum = hist.sum()
+        pdf = [v / sum for v in hist]
+        for i in range(1, 256):
+            pdf[i] = pdf[i - 1] + pdf[i]
+        hists.append(pdf)
+    hists = np.array(hists)
+    return hists
+
 def preprocess(image):
     '''
     Normalize image array.
     '''
     return (tf.cast(image, tf.float32) / 255.0 - 0.5) * 2
+
+def hist_match_func(src, ref, mask_src, mask_ref, idx_src):
+    """
+    Adjust the pixel values of images such that its histogram
+    matches that of a target image
+
+    Arguments:
+    -----------
+        source: np.ndarray
+            Image to transform; the histogram is computed over the flattened
+            array
+        reference: np.ndarray
+            Reference image; can have different dimensions to source
+        index:
+            the index of pixels that need to be transformed
+    Returns:
+    -----------
+        matched: np.ndarray
+            The transformed output image
+    """
+
+    img_src = np.array(src, dtype = np.uint8)
+    img_ref = np.array(ref, dtype = np.uint8)
+
+    # # CARA 1
+    # result = np.zeros(oldshape, dtype = np.uint8)
+    # for c in range(3):
+    #     s = source[c].ravel()
+    #     r = reference[c].ravel()
+
+    #     s_values, bin_idx, s_counts = np.unique(s, return_inverse=True, return_counts=True)
+    #     r_values, r_counts = np.unique(r, return_counts=True)
+
+    #     if(len(s_counts) == 1 or len(r_counts) == 1):
+    #         continue
+    #     # take the cumsum of the counts and normalize by the number of pixels to
+    #     # get the empirical cumulative distribution functions for the source and
+    #     # template images (maps pixel value --> quantile)
+    #     s_quantiles = np.cumsum(s_counts).astype(np.float64)
+    #     s_quantiles /= s_quantiles[-1]
+    #     r_quantiles = np.cumsum(r_counts).astype(np.float64)
+    #     r_quantiles /= r_quantiles[-1]
+    #     r_values = r_values
+
+    #     # interpolate linearly to find the pixel values in the template image
+    #     # that correspond most closely to the quantiles in the source image
+    #     interp_value = np.zeros_like(s_values, dtype = np.float32)
+    #     interp_r_values = np.interp(s_quantiles, r_quantiles, r_values)
+    #     interp_value = interp_r_values
+    #     result[:, :, c] = interp_value[bin_idx].reshape(oldshape[0:2])
+
+
+    # # CARA 2
+    # result = match_histograms(source_img, reference_img, multichannel=True)
+
+    # CARA 3
+    dst_align = [img_src[idx_src[0], idx_src[1], i] for i in range(3)]
+    hist_dst = get_histogram(img_src, mask_src)
+    hist_ref = get_histogram(img_ref, mask_ref)
+    tables = [cal_trans(hist_dst[i], hist_ref[i]) for i in range(3)]
+
+    mid = copy.deepcopy(dst_align)
+    for i in range(0, 3):
+        for k in range(0, len(idx_src[0])):
+            dst_align[i][k] = tables[i][int(mid[i][k])]
+
+    for i in range(0, 3):
+        img_src[idx_src[0], idx_src[1], i] = dst_align[i]
+
+    img_src = np.array(img_src)
+
+    return img_src
 
 def getMakeupGroundTruth_histogram(images, masks, reference_images, reference_masks):
     '''
@@ -108,54 +155,52 @@ def getMakeupGroundTruth_histogram(images, masks, reference_images, reference_ma
     Returns:
         A dictionary that contains the data information for training.
     '''
-    h, w, c = (256, 256, 3)
-    face = [1, 6, 11, 12, 13]
-    brow = [2, 3]
-    eye = [2, 3, 4, 5]
-    lip = [7, 9]
-    non_makeup = [0, 4, 5, 8, 10]
-    hair = [10]
-    whole_face = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    batch_size = 1
-
-    # masks = tf.convert_to_tensor([masks], dtype=tf.int32)
-    # reference_images = tf.convert_to_tensor([reference_images], dtype=tf.int32)
-    # reference_masks = tf.convert_to_tensor([reference_masks], dtype=tf.int32)
+    id_face = [1, 6, 11, 12, 13]
+    id_brow = [2, 3]
+    id_eye = [2, 3, 4, 5]
+    id_lip = [7, 9]
+    id_hair = [10]
 
     # get source mask of each source makeup region
-    hair_masks = masking_func(masks, tf.constant(hair, dtype = tf.int32))
-    face_masks = masking_func(masks, tf.constant(face, dtype = tf.int32))
-    brow_masks = masking_func(masks, tf.constant(brow, dtype = tf.int32))
-    eye_masks = masking_func(masks, tf.constant(eye, dtype = tf.int32))
-    eye_masks = tf.clip_by_value(eye_regions_func(eye_masks), 0, 1)
+    hair_masks = masking_func(masks, tf.constant(id_hair, dtype = tf.int32))
+    face_masks = masking_func(masks, tf.constant(id_face, dtype = tf.int32))
+    brow_masks = masking_func(masks, tf.constant(id_brow, dtype = tf.int32))
+    eye_masks = masking_func(masks, tf.constant(id_eye, dtype = tf.int32))
+    eye_masks = tf.clip_by_value(eye_regions_func(eye_masks) - eye_masks, 0, 1)
     eye_masks = tf.clip_by_value(eye_masks - hair_masks - brow_masks, 0, 1)
-    lip_masks = masking_func(masks, tf.constant(lip, dtype = tf.int32))
+    lip_masks = masking_func(masks, tf.constant(id_lip, dtype = tf.int32))
 
     hair_masks = process_mask(hair_masks)
     face_masks = process_mask(face_masks)
     brow_masks = process_mask(brow_masks)
     eye_masks = process_mask(eye_masks)
     lip_masks = process_mask(lip_masks)
-    
-    face_src = cv2.bitwise_and(images, images, mask = face_masks)
-    lip_src = cv2.bitwise_and(images, images, mask = lip_masks)
-    eye_src = cv2.bitwise_and(images, images, mask = eye_masks)
-    brow_src = cv2.bitwise_and(images, images, mask = brow_masks)
 
-    cv2.imshow("face_src", face_src)
-    cv2.imshow("lip_src", lip_src)
-    cv2.imshow("eye_src", eye_src)
-    cv2.imshow("brow_src", brow_src)
-    cv2.waitKey(0)  
+    hair_index = np.where(hair_masks > 0)
+    face_index = np.where(face_masks > 0)
+    brow_index = np.where(brow_masks > 0)
+    eye_index = np.where(eye_masks > 0)
+    lip_index = np.where(lip_masks > 0)
+    
+    face = cv2.bitwise_and(images, images, mask = face_masks)
+    lip = cv2.bitwise_and(images, images, mask = lip_masks)
+    eye = cv2.bitwise_and(images, images, mask = eye_masks)
+    brow = cv2.bitwise_and(images, images, mask = brow_masks)
+
+    # cv2.imshow("face", face)
+    # cv2.imshow("lip", lip)
+    # cv2.imshow("eye", eye)
+    # cv2.imshow("brow", brow)
+    # cv2.waitKey(0)
     
     # get reference mask of each reference makeup region
-    r_hair_masks = masking_func(reference_masks, tf.constant(hair, dtype = tf.int32))
-    r_face_masks = masking_func(reference_masks, tf.constant(face, dtype = tf.int32))
-    r_brow_masks = masking_func(reference_masks, tf.constant(brow, dtype = tf.int32))
-    r_eye_masks = masking_func(reference_masks, tf.constant(eye, dtype = tf.int32))
+    r_hair_masks = masking_func(reference_masks, tf.constant(id_hair, dtype = tf.int32))
+    r_face_masks = masking_func(reference_masks, tf.constant(id_face, dtype = tf.int32))
+    r_brow_masks = masking_func(reference_masks, tf.constant(id_brow, dtype = tf.int32))
+    r_eye_masks = masking_func(reference_masks, tf.constant(id_eye, dtype = tf.int32))
     r_eye_masks = tf.clip_by_value(eye_regions_func(r_eye_masks) - r_eye_masks, 0, 1)
     r_eye_masks = tf.clip_by_value(r_eye_masks - r_hair_masks - r_brow_masks, 0, 1)
-    r_lip_masks = masking_func(reference_masks, tf.constant(lip, dtype = tf.int32))
+    r_lip_masks = masking_func(reference_masks, tf.constant(id_lip, dtype = tf.int32))
     
     r_hair_masks = process_mask(r_hair_masks)
     r_face_masks = process_mask(r_face_masks)
@@ -163,27 +208,15 @@ def getMakeupGroundTruth_histogram(images, masks, reference_images, reference_ma
     r_eye_masks = process_mask(r_eye_masks)
     r_lip_masks = process_mask(r_lip_masks)
     
-    r_face = cv2.bitwise_and(images, images, mask = r_face_masks)
-    r_lip = cv2.bitwise_and(images, images, mask = r_lip_masks)
-    r_eye = cv2.bitwise_and(images, images, mask = r_eye_masks)
-    r_brow = cv2.bitwise_and(images, images, mask = r_brow_masks)
+    r_face = cv2.bitwise_and(reference_images, reference_images, mask = r_face_masks)
+    r_lip = cv2.bitwise_and(reference_images, reference_images, mask = r_lip_masks)
+    r_eye = cv2.bitwise_and(reference_images, reference_images, mask = r_eye_masks)
+    r_brow = cv2.bitwise_and(reference_images, reference_images, mask = r_brow_masks)
 
-    cv2.imshow("r_face", r_face)
-    cv2.imshow("r_brow", r_brow)
-    cv2.imshow("r_eye", r_eye)
-    cv2.imshow("r_lip", r_lip)
-    cv2.waitKey(0)    
-    
-    face_true = tf.py_function(hist_match_func, inp=[face_src, r_face], Tout = tf.float32)
-    brow_true = tf.py_function(hist_match_func, inp=[brow_src, r_brow], Tout = tf.float32)
-    eye_true = tf.py_function(hist_match_func, inp=[eye_src, r_eye], Tout = tf.float32)
-    lip_true = tf.py_function(hist_match_func, inp=[lip_src, r_lip], Tout = tf.float32)
-
-    cv2.imshow("face", face_true.numpy())
-    cv2.imshow("brow", brow_true.numpy())
-    cv2.imshow("eye", eye_true.numpy())
-    cv2.imshow("lip", lip_true.numpy())
-    cv2.waitKey(0)
+    face_true = hist_match_func(face, r_face, face_masks, r_face_masks, face_index)
+    brow_true = hist_match_func(brow, r_brow, brow_masks, r_brow_masks, brow_index)
+    eye_true = hist_match_func(eye, r_eye, eye_masks, r_eye_masks, eye_index)
+    lip_true = hist_match_func(lip, r_lip, lip_masks, r_lip_masks, lip_index)
 
     return [face_true, brow_true, eye_true, lip_true]
 
@@ -202,23 +235,35 @@ if __name__ == '__main__':
     seg_makeup = []
     seg_non_makeup = []
 
-    makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/12.png")
-    makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/94.png")
-    makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/1635.png")
-    makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/103.png")
-    seg_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/12.png")
-    seg_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/94.png")
-    seg_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/1635.png")
-    seg_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/103.png")
+    # # RYZEN
+    # makeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/"
+    # nonmakeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/"
+    # seg_makeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/"
+    # seg_nonmakeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/"
 
-    non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/vSYYZ25.png")
-    non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/vSYYZ51.png")
-    non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/vSYYZ25.png")
-    non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/vSYYZ663.png")
-    seg_non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/vSYYZ25.png")
-    seg_non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/vSYYZ51.png")
-    seg_non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/vSYYZ25.png")
-    seg_non_makeup.append("D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/vSYYZ663.png")
+    # MAC
+    makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/images/makeup/"
+    nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/images/non-makeup/"
+    seg_makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/makeup/"
+    seg_nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/non-makeup/"
+
+    makeup.append(makeup_directory + "12.png")
+    # makeup.append(makeup_directory + "94.png")
+    # makeup.append(makeup_directory + "1635.png")
+    # makeup.append(makeup_directory + "103.png")
+    seg_makeup.append(seg_makeup_directory + "12.png")
+    seg_makeup.append(seg_makeup_directory + "94.png")
+    seg_makeup.append(seg_makeup_directory + "1635.png")
+    seg_makeup.append(seg_makeup_directory + "103.png")
+
+    non_makeup.append(nonmakeup_directory + "vSYYZ25.png")
+    non_makeup.append(nonmakeup_directory + "vSYYZ51.png")
+    non_makeup.append(nonmakeup_directory + "vSYYZ25.png")
+    non_makeup.append(nonmakeup_directory + "vSYYZ663.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ25.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ51.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ25.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ663.png")
 
     for i in range (len(makeup)):
         print("warping ", makeup[i], non_makeup[i])
@@ -229,10 +274,10 @@ if __name__ == '__main__':
         seg_src_img = cv2.imread(seg_makeup[i])
         seg_dst_img = cv2.imread(seg_non_makeup[i])
         dim = (256,256)
-        src_img = cv2.resize(src_img, dim, interpolation = cv2.INTER_AREA)
-        dst_img = cv2.resize(dst_img, dim, interpolation = cv2.INTER_AREA)
-        seg_src_img = cv2.resize(seg_src_img, dim, interpolation = cv2.INTER_AREA)
-        seg_dst_img = cv2.resize(seg_dst_img, dim, interpolation = cv2.INTER_AREA)
+        src_img = cv2.resize(src_img, dim, interpolation = cv2.INTER_LINEAR)
+        dst_img = cv2.resize(dst_img, dim, interpolation = cv2.INTER_LINEAR)
+        seg_src_img = cv2.resize(seg_src_img, dim, interpolation = cv2.INTER_NEAREST)
+        seg_dst_img = cv2.resize(seg_dst_img, dim, interpolation = cv2.INTER_NEAREST)
 
         # cv2.imshow("src_img", src_img)
         # cv2.imshow("dst_img", dst_img)
@@ -255,11 +300,6 @@ if __name__ == '__main__':
                 output = face_swap(src_face, dst_face["face"], src_points,
                                 dst_face["points"], dst_face["shape"],
                                 output)
-        
-            # cv2.imshow("src_img",src_img)
-            # cv2.imshow("dst_img",dst_img)
-            # cv2.imshow("output",output)
-            # cv2.waitKey(0)
             output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
             images = [src_img, dst_img, output]
             new_im = cv2.hconcat(images)
@@ -268,8 +308,21 @@ if __name__ == '__main__':
             print(img_path)
             cv2.imwrite(img_path, new_im)
 
-        # # HISTOGRAM MATCHING
-        # img_path2 = "D:/# Raras/GitHub/TA/groundtruth/coba/matching_{}.png".format(i)
-        # result = getMakeupGroundTruth_histogram(src_img, seg_src_img, dst_img, seg_dst_img)
-        # cv2.imshow("face", result[0].numpy())
-        # cv2.waitKey(0)
+        # HISTOGRAM MATCHING
+        img_path2 = "D:/# Raras/GitHub/TA/groundtruth/coba/matching_{}.png".format(i)
+        result = getMakeupGroundTruth_histogram(dst_img, seg_dst_img, src_img, seg_src_img)
+
+        face_true = result[0]
+        brow_true = result[1]
+        eye_true = result[2]
+        lip_true = result[3]
+
+        brow_true[brow_true == 0] = lip_true[brow_true == 0]
+        brow_true[brow_true == 0] = eye_true[brow_true == 0]
+        brow_true[brow_true == 0] = face_true[brow_true == 0]
+        brow_true[brow_true == 0] = dst_img[brow_true == 0]
+
+        cv2.imshow("src", src_img)
+        cv2.imshow("dst", dst_img)
+        cv2.imshow("result histogram", brow_true)
+        cv2.waitKey(0)
