@@ -189,10 +189,42 @@ def get_lip_mask(size, points, erode_flag=0):
     mask_lips_no_mouth = cv2.bitwise_not(mask_lips_no_mouth)
 
     if erode_flag:
-        mask = cv2.erode(mask, kernel,iterations=1)
+        mask = cv2.erode(mask, kernel, iterations=1)
 
     return mask_lips_no_mouth
 
+def get_eye_region(size, mask_l, mask_r):
+    mask = np.zeros(size, np.uint8)
+    # eye_points_l = np.array(points[36:42], np.int32)
+    # eye_points_r = np.array(points[42:48], np.int32)
+    # radius = int((abs(points[36][0] - points[39][0]) // 2) * 1.75)
+    # convexhull_eye_l = cv2.convexHull(eye_points_l)
+    # convexhull_eye_r = cv2.convexHull(eye_points_r)
+
+    # cv2.fillConvexPoly(mask, convexhull_eye_r, 255)
+    # cv2.fillConvexPoly(mask, convexhull_eye_l, 255)
+
+    ret, threshl = cv2.threshold(mask_l, 50, 255, cv2.THRESH_BINARY)
+    ret, threshr = cv2.threshold(mask_r, 50, 255, cv2.THRESH_BINARY)
+    contoursl, hierarchy = cv2.findContours(threshl, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contoursr, hierarchy = cv2.findContours(threshr, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    hull_l = []
+    hull_r = []
+    for i in range(len(contoursl)):
+        hull_l.append(cv2.convexHull(contoursl[i], False))
+    for i in range(len(contoursr)):
+        hull_r.append(cv2.convexHull(contoursr[i], False))
+    
+    r_l = cv2.boundingRect(hull_l[0])
+    center_l = ((r_l[0] + int(r_l[2] / 2), r_l[1] + int(r_l[3] / 2)))
+    r_r = cv2.boundingRect(hull_r[0])
+    center_r = ((r_r[0] + int(r_r[2] / 2), r_r[1] + int(r_r[3] / 2)))
+    radius = int(abs(r_l[0] - r_l[2]) // 4)
+
+    circle_l = cv2.circle(mask, center_l, radius, (255, 255, 255), -1)
+    circle_r = cv2.circle(mask, center_r, radius, (255, 255, 255), -1)
+
+    return mask
 
 ## Color Correction
 def correct_colours(im1, im2, landmarks1):
@@ -257,6 +289,8 @@ def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, en
 
     ## 3d warp
     warped_src_face = warp_image_3d(src_face, src_points[:end], dst_points[:end], (h, w))
+    cv2.imshow("warped_src_face", warped_src_face)
+    cv2.waitKey(0)
     ## Mask for blending
     mask = mask_from_points((h, w), dst_points)
     mask_src = np.mean(warped_src_face, axis=2) > 0
@@ -280,3 +314,44 @@ def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, en
     dst_img_cp[y:y + h, x:x + w] = output
 
     return dst_img_cp
+
+def get_mask(size, seg, classes_list):
+    mask = np.zeros(size).astype(np.uint8)
+    seg = seg.astype(np.uint8)
+    for i in classes_list:
+        mask[seg == i] = 255
+    return mask
+
+def getMakeupGroundTruth_warping(face_src, face_dst, seg_dst, points_src, points_dst):
+    h, w = face_dst.shape[:2]
+    end = 68
+    id_face = [1]
+    id_brow = [2, 3]
+    id_eye_l = [4]
+    id_eye_r = [5]
+    id_lip = [7, 9]
+    id_hair = [10]
+
+    warped_src_face = warp_image_3d(face_src, points_src[:end], points_dst[:end], (h, w))
+    face_mask = get_mask((h, w), seg_dst, id_face)
+    brow_mask = get_mask((h, w), seg_dst, id_brow)
+    lip_mask = get_mask((h, w), seg_dst, id_lip)
+    eyeball_mask_l = get_mask((h, w), seg_dst, id_eye_l)
+    eyeball_mask_r = get_mask((h, w), seg_dst, id_eye_r)
+    eye_mask = get_eye_region((h, w), eyeball_mask_l, eyeball_mask_r)
+
+
+    mask_copy = brow_mask + lip_mask + eye_mask
+    mask_blend = face_mask - mask_copy
+    mask_copy.reshape((h, w, 3))
+    seg_copy = np.asarray(mask_copy * warped_src_face, dtype=np.uint8)
+    seg_blend = np.asarray(mask_blend * warped_src_face, dtype=np.uint8)
+
+    mask = mask_from_points((h, w), points_dst)
+    r = cv2.boundingRect(mask)
+    center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
+    output = cv2.seamlessClone(warped_src_face, face_dst, mask_blend, center, cv2.MIXED_CLONE)
+
+    output[seg_copy > 0] = seg_copy[seg_copy > 0]
+
+    return output

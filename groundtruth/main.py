@@ -9,8 +9,14 @@ from skimage.exposure import match_histograms
 import copy
 
 from face_detection import select_face, select_all_faces
-from face_swap import face_swap
+from face_swap import face_swap, getMakeupGroundTruth_warping
 from face_parsing import get_face
+
+id_face = [1, 6, 11, 12, 13]
+id_brow = [2, 3]
+id_eye = [2, 3, 4, 5]
+id_lip = [7, 9]
+id_hair = [10]
 
 def eye_regions_func(mask):
     vertical = tf.clip_by_value(tf.reduce_sum(mask, axis = 0, keepdims = True), 0, 1)
@@ -155,11 +161,6 @@ def getMakeupGroundTruth_histogram(images, masks, reference_images, reference_ma
     Returns:
         A dictionary that contains the data information for training.
     '''
-    id_face = [1, 6, 11, 12, 13]
-    id_brow = [2, 3]
-    id_eye = [2, 3, 4, 5]
-    id_lip = [7, 9]
-    id_hair = [10]
 
     # get source mask of each source makeup region
     hair_masks = masking_func(masks, tf.constant(id_hair, dtype = tf.int32))
@@ -235,17 +236,17 @@ if __name__ == '__main__':
     seg_makeup = []
     seg_non_makeup = []
 
-    # # RYZEN
-    # makeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/"
-    # nonmakeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/"
-    # seg_makeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/"
-    # seg_nonmakeup_directory =  "D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/"
+    # RYZEN
+    makeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/"
+    nonmakeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/"
+    seg_makeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/"
+    seg_nonmakeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/"
 
     # MAC
-    makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/images/makeup/"
-    nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/images/non-makeup/"
-    seg_makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/makeup/"
-    seg_nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/non-makeup/"
+    # makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/images/makeup/"
+    # nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/images/non-makeup/"
+    # seg_makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/makeup/"
+    # seg_nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/non-makeup/"
 
     makeup.append(makeup_directory + "12.png")
     # makeup.append(makeup_directory + "94.png")
@@ -271,8 +272,8 @@ if __name__ == '__main__':
         # Read images
         src_img = cv2.imread(makeup[i])
         dst_img = cv2.imread(non_makeup[i])
-        seg_src_img = cv2.imread(seg_makeup[i])
-        seg_dst_img = cv2.imread(seg_non_makeup[i])
+        seg_src_img = cv2.imread(seg_makeup[i], 0)
+        seg_dst_img = cv2.imread(seg_non_makeup[i], 0)
         dim = (256,256)
         src_img = cv2.resize(src_img, dim, interpolation = cv2.INTER_LINEAR)
         dst_img = cv2.resize(dst_img, dim, interpolation = cv2.INTER_LINEAR)
@@ -281,6 +282,8 @@ if __name__ == '__main__':
 
         # cv2.imshow("src_img", src_img)
         # cv2.imshow("dst_img", dst_img)
+        # cv2.imshow("seg_src_img", seg_src_img)
+        # cv2.imshow("seg_dst_img", seg_dst_img)
         # cv2.waitKey(0)
 
         # WARPING
@@ -297,12 +300,16 @@ if __name__ == '__main__':
         else:
             output = dst_img
             for k, dst_face in dst_faceBoxes.items():
-                output = face_swap(src_face, dst_face["face"], src_points,
-                                dst_face["points"], dst_face["shape"],
-                                output)
+                output = getMakeupGroundTruth_warping(src_face, dst_img, seg_dst_img, src_points, dst_face["points"])
+                # output = face_swap(src_face, dst_face["face"], src_points,
+                #                 dst_face["points"], dst_face["shape"],
+                #                 output)
             output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
             images = [src_img, dst_img, output]
             new_im = cv2.hconcat(images)
+
+            cv2.imshow("new image", new_im)
+            cv2.waitKey(0)
 
             img_path = "D:/# Raras/GitHub/TA/groundtruth/coba/warping_{}.png".format(i)
             print(img_path)
