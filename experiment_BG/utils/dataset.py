@@ -159,7 +159,7 @@ class Dataset(object):
         images2_mask = tf.cast(images2_mask, dtype = tf.float32)
 
         # processing makeup mask
-        makeup_mask1 = tf.abs(1.0 -masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
+        makeup_mask1 = tf.abs(1.0-masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
         makeup_mask1 = tf.clip_by_value(tf.cast(makeup_mask1, dtype = tf.float32), 0, 1)
         background_mask1 = tf.abs(masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
         background_mask1 = tf.clip_by_value(tf.cast(background_mask1, dtype = tf.float32), 0, 1)
@@ -247,11 +247,11 @@ class Dataset(object):
         mask_copy = tf.clip_by_value(eye_masks + brow_masks + lip_masks, 0, 1)
         whole_face_blend = tf.py_function(warping_blend, inp=[images, r_whole_face], Tout = tf.float32)
         whole_face_copy = tf.py_function(warping_copy, inp=[images, r_whole_face, mask_copy], Tout = tf.float32)
+        eye_masks2 = tf.clip_by_value(eye_masks - eyeball_masks_l - eyeball_masks_r, 0, 1)
 
-        eye_masks = tf.clip_by_value(eye_masks - eyeball_masks_l - eyeball_masks_r - brow_masks - hair_masks, 0, 1)
         face_true = whole_face_blend * face_masks
         brow_true = whole_face_copy * brow_masks
-        eye_true = whole_face_copy * eye_masks
+        eye_true = whole_face_copy * eye_masks2
         lip_true = whole_face_copy * lip_masks
 
         face_true.set_shape((self.batch_size, h , w, c))
@@ -268,6 +268,6 @@ class Dataset(object):
         # prevent background form changing
         face_true = face_true * face_masks
         brow_true = brow_true * brow_masks
-        eye_true = eye_true * eye_masks
+        eye_true = eye_true * eye_masks2
         lip_true = lip_true * lip_masks
-        return [face_true, brow_true, eye_true, lip_true], [face_masks, brow_masks, eye_masks, lip_masks]
+        return [face_true, brow_true, eye_true, lip_true], [face_masks, brow_masks, eye_masks2, lip_masks]

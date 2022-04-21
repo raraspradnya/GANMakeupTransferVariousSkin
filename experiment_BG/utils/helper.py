@@ -174,8 +174,11 @@ def get_eye_region(size, mask_l, mask_r):
         mask_left = np.array(mask_l[i].numpy(), np.uint8)
         mask_right = np.array(mask_r[i].numpy(), np.uint8)
 
+        eyeball_mask = mask_left + mask_right
+
         mask_left[mask_left > 0] = 255
         mask_right[mask_right > 0] = 255
+        eyeball_mask[eyeball_mask > 0] = 255
 
         ret, threshl = cv2.threshold(mask_left, 50, 255, cv2.THRESH_BINARY)
         ret, threshr = cv2.threshold(mask_right, 50, 255, cv2.THRESH_BINARY)
@@ -198,6 +201,9 @@ def get_eye_region(size, mask_l, mask_r):
             center_r = ((r_r[0] + int(r_r[2] / 2), r_r[1] + int(r_r[3] / 2)))
             r_right = int(math.sqrt(r_r[2]**2 + r_r[3]**2) * 0.8)
             circle_r = cv2.circle(mask, center_r, r_right, (255, 255, 255), -1)
+        eyeball_mask = cv2.bitwise_not(eyeball_mask)
+        mask = cv2.bitwise_xor(mask, eyeball_mask)
+        mask = cv2.bitwise_not(mask)
         masks.append(mask)
     result = np.array(masks, dtype = np.float32)
     return result

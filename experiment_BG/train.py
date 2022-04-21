@@ -9,7 +9,7 @@ params = {
 
         "image_shape" : (256, 256, 3),
         "classes" : {"face" : [1, 6, 11, 12, 13], "brow" : [2, 3], "eye" : [2, 3, 4, 5], "eyeball_l" : [4], "eyeball_r" : [5], "lip" : [7, 9], "non-makeup" : [0, 4, 5, 8, 10], 
-                     "hair" : [10], "whole_face" : [1, 2, 3, 4, 5, 6, 7, 8, 9]},
+                     "hair" : [10], "whole_face" : [1, 2, 3, 4, 5, 6, 7, 8, 9], "face_makeup" : [1, 2, 3, 6, 7, 9]},
 
         "logs_path" : 'logs/DRN/10',
         "pretrained_model_path" : None, #'logs/DRN/09/checkpoint/0096.ckpt',
