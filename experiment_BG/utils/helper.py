@@ -4,13 +4,12 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import cv2
 from datetime import datetime
-import pandas as pd
-
+import math
 
 import sys
 sys.path.append('../')
 from groundtruth.face_detection import select_face, select_all_faces
-from groundtruth.face_swap import face_swap
+from groundtruth.face_swap import face_blend, face_copy
 
 fig = plt.figure(figsize=(10,15))
 def save_images(epoch, step, origin_images, pred_images, reference_images, pic_save_path):
@@ -38,7 +37,7 @@ def save_images(epoch, step, origin_images, pred_images, reference_images, pic_s
         plt.axis('off')
 
         pos += 3
-    save_path = os.path.join(pic_save_path, 'image_at_epoch_{:04d}_{:04d}.png'.format(epoch, step))
+    save_path = os.path.join(pic_save_path, 'epoch_{:04d}_{:04d}.png'.format(epoch, step))
     save_path = os.path.normpath(save_path)
     plt.savefig(save_path)
     plt.clf()
@@ -96,7 +95,7 @@ def hist_match_func(source, reference):
     result = np.array(result, dtype=np.float32)
     return result
 
-def warping(source, reference):
+def warping_blend(source, reference):
     '''
         Warp reference (makeup face) to source image (non-makeup face)
         input:
@@ -124,10 +123,83 @@ def warping(source, reference):
         src_faceBoxes = select_all_faces(s)
         output = s
         for k, src_face in src_faceBoxes.items():
-            result[i] = (face_swap(ref_face, src_face["face"], ref_points,
+            result[i] = (face_blend(ref_face, src_face["face"], ref_points,
                             src_face["points"], src_face["shape"],
                             output))
     result = np.array(result, dtype = np.float32)
+    return result
+
+
+def warping_copy(source, reference, mask_copy):
+    '''
+        Warp reference (makeup face) to source image (non-makeup face)
+        input:
+            source : np.ndarray
+                original non-makeup face
+            reference : np.ndarray
+                segmented makeup face (only whole_face part of the image)
+        output:
+            result : np.ndarray
+                makeup face already warped to original non-makeup face
+    '''
+    oldshape = source.shape
+    batch_size = oldshape[0]
+    source = np.array(source, dtype = np.uint8)
+    reference = np.array(reference, dtype = np.uint8)
+    mask_copy = np.array(mask_copy, dtype = np.uint8)
+
+    # counts
+    result = np.zeros(oldshape, dtype = np.uint8)
+    for i in range(batch_size):
+        s = source[i]
+        r = reference[i]
+        copy = mask_copy[i]
+        ref_points, ref_shape, ref_face, check = select_face(r)
+        if (check ==  0):
+            return source
+        src_faceBoxes = select_all_faces(s)
+        output = s
+        for k, src_face in src_faceBoxes.items():
+            result[i] = (face_copy(ref_face, src_face["face"], ref_points,
+                            src_face["points"], src_face["shape"],
+                            output, copy))
+    result = np.array(result, dtype = np.float32)
+    return result
+
+def get_eye_region(size, mask_l, mask_r):
+    masks = []
+    batch_size = mask_l.shape[0]
+    for i in range (batch_size):
+        mask = np.zeros(size.numpy(), np.uint8)
+        mask_left = np.array(mask_l[i].numpy(), np.uint8)
+        mask_right = np.array(mask_r[i].numpy(), np.uint8)
+
+        mask_left[mask_left > 0] = 255
+        mask_right[mask_right > 0] = 255
+
+        ret, threshl = cv2.threshold(mask_left, 50, 255, cv2.THRESH_BINARY)
+        ret, threshr = cv2.threshold(mask_right, 50, 255, cv2.THRESH_BINARY)
+        contoursl, hierarchy = cv2.findContours(threshl, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contoursr, hierarchy = cv2.findContours(threshr, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        hull_l = []
+        hull_r = []
+        for i in range(len(contoursl)):
+            hull_l.append(cv2.convexHull(contoursl[i], False))
+        for i in range(len(contoursr)):
+            hull_r.append(cv2.convexHull(contoursr[i], False))
+
+        if (len(hull_l) > 0):
+            r_l = cv2.boundingRect(hull_l[0])
+            center_l = ((r_l[0] + int(r_l[2] / 2), r_l[1] + int(r_l[3] / 2)))
+            r_left = int(math.sqrt(r_l[2]**2 + r_l[3]**2) * 0.8)
+            circle_l = cv2.circle(mask, center_l, r_left, (255, 255, 255), -1)
+        if (len(hull_r) > 0):
+            r_r = cv2.boundingRect(hull_r[0])
+            center_r = ((r_r[0] + int(r_r[2] / 2), r_r[1] + int(r_r[3] / 2)))
+            r_right = int(math.sqrt(r_r[2]**2 + r_r[3]**2) * 0.8)
+            circle_r = cv2.circle(mask, center_r, r_right, (255, 255, 255), -1)
+        masks.append(mask)
+    result = np.array(masks, dtype = np.float32)
     return result
 
 @tf.function

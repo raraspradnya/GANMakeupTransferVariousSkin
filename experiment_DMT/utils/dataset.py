@@ -161,10 +161,12 @@ class Dataset(object):
         # processing makeup mask
         makeup_mask1 = tf.abs(1.0 -masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
         makeup_mask1 = tf.clip_by_value(tf.cast(makeup_mask1, dtype = tf.float32), 0, 1)
+        background_mask1 = tf.abs(masking_func(images1_mask, tf.constant(self.classes["non-makeup"], dtype = tf.int32)))
+        background_mask1 = tf.clip_by_value(tf.cast(background_mask1, dtype = tf.float32), 0, 1)
 
         # return data
         data = {'images1' : images1, 'images2' : images2}
-        labels = {'images1' : images1, 'images2' : images2, 'makeup_mask' : makeup_mask1,
+        labels = {'images1' : images1, 'images2' : images2, 'background_mask1' : background_mask1, 'makeup_mask' : makeup_mask1,
                 'face_true' : makeup_true[0], 'brow_true' : makeup_true[1], 'eye_true' : makeup_true[2], 'lip_true' : makeup_true[3],
                 'face_mask' : makeup_masks[0], 'brow_mask' : makeup_masks[1], 'eye_mask' : makeup_masks[2], 'lip_mask' : makeup_masks[3],
                 }
@@ -277,7 +279,7 @@ class Dataset(object):
         eye_true = eye_true * eye_masks
         lip_true = lip_true * lip_masks
         return [face_true, brow_true, eye_true, lip_true], [face_masks, brow_masks, eye_masks, lip_masks]
-    
+   
     @tf.function
     def getMakeupGroundTruth(self, images, masks, reference_images, reference_masks):
         '''
@@ -329,11 +331,6 @@ class Dataset(object):
         lip_true = whole_face_true * lip_masks
 
         whole_face_true.set_shape((self.batch_size, h, w, c))
-
-        # face_true = tf.py_function(hist_match_func, inp=[face, r_face], Tout = tf.float32)
-        # brow_true = tf.py_function(hist_match_func, inp=[brow, r_brow], Tout = tf.float32)
-        # eye_true = tf.py_function(hist_match_func, inp=[eye, r_eye], Tout = tf.float32)
-        # lip_true = tf.py_function(hist_match_func, inp=[lip, r_lip], Tout = tf.float32)
         face_true.set_shape((self.batch_size, h , w, c))
         brow_true.set_shape((self.batch_size, h , w, c))
         eye_true.set_shape((self.batch_size, h , w, c))

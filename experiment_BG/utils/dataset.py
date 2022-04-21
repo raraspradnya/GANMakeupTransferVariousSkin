@@ -8,7 +8,7 @@ from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 from datetime import datetime
 
 
-from utils.helper import masking_func, eye_regions_func, warping
+from utils.helper import masking_func, warping_blend, warping_copy, get_eye_region
 
 NUM_PARALLEL_CALLS = 2
 SHUFFLE_BUFFER_SIZE = 2000
@@ -186,7 +186,7 @@ class Dataset(object):
 
         # repeat and shuffle
         if(self.isTraining):
-            dataset1 = dataset1.repeat()
+            dataset1 = dataset1.repeat(3)
             dataset1 = dataset1.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
             dataset2 = dataset2.repeat()
             dataset2 = dataset2.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
@@ -231,26 +231,28 @@ class Dataset(object):
 
         # get reference mask of each reference makeup region
         r_whole_face_masks = masking_func(reference_masks, tf.constant(self.classes["whole_face"], dtype = tf.int32))
+        r_whole_face = reference_images * r_whole_face_masks
 
         # get source mask of each source makeup region
         hair_masks = masking_func(masks, tf.constant(self.classes["hair"], dtype = tf.int32))
         face_masks = masking_func(masks, tf.constant(self.classes["face"], dtype = tf.int32))
         brow_masks = masking_func(masks, tf.constant(self.classes["brow"], dtype = tf.int32))
-        eye_masks = masking_func(masks, tf.constant(self.classes["eye"], dtype = tf.int32))
-        eyeball_masks = masking_func(masks, tf.constant(self.classes["eyeball"], dtype = tf.int32))
-        eye_masks = tf.clip_by_value(eye_regions_func(eye_masks), 0, 1)
-        eye_masks = tf.clip_by_value(eye_masks - hair_masks - brow_masks - eyeball_masks, 0, 1)
+        eyeball_masks_l = masking_func(masks, tf.constant(self.classes["eyeball_l"], dtype = tf.int32))
+        eyeball_masks_r = masking_func(masks, tf.constant(self.classes["eyeball_r"], dtype = tf.int32))
         lip_masks = masking_func(masks, tf.constant(self.classes["lip"], dtype = tf.int32))
-        
-        r_whole_face = reference_images * r_whole_face_masks
+        eye_masks = tf.py_function(get_eye_region, inp=[(h, w), eyeball_masks_l, eyeball_masks_r], Tout=tf.float32)
+        eye_masks = tf.expand_dims(eye_masks, -1)
 
         # Get ground truth
-        whole_face_true = tf.py_function(warping, inp=[images, r_whole_face], Tout = tf.float32)
+        mask_copy = tf.clip_by_value(eye_masks + brow_masks + lip_masks, 0, 1)
+        whole_face_blend = tf.py_function(warping_blend, inp=[images, r_whole_face], Tout = tf.float32)
+        whole_face_copy = tf.py_function(warping_copy, inp=[images, r_whole_face, mask_copy], Tout = tf.float32)
 
-        face_true = whole_face_true * face_masks
-        brow_true = whole_face_true * brow_masks
-        eye_true = whole_face_true * eye_masks
-        lip_true = whole_face_true * lip_masks
+        eye_masks = tf.clip_by_value(eye_masks - eyeball_masks_l - eyeball_masks_r - brow_masks - hair_masks, 0, 1)
+        face_true = whole_face_blend * face_masks
+        brow_true = whole_face_copy * brow_masks
+        eye_true = whole_face_copy * eye_masks
+        lip_true = whole_face_copy * lip_masks
 
         face_true.set_shape((self.batch_size, h , w, c))
         brow_true.set_shape((self.batch_size, h , w, c))

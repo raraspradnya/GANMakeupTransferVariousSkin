@@ -5,6 +5,7 @@ import numpy as np
 import scipy.spatial as spatial
 import logging
 import matplotlib.pyplot as plt
+import math
 
 ## 3D Transform
 def bilinear_interpolate(img, coords):
@@ -193,7 +194,7 @@ def get_lip_mask(size, points, erode_flag=0):
 
     return mask_lips_no_mouth
 
-def get_eye_region(size, mask_l, mask_r):
+def get_eye_region(size, mask_l, mask_r, points):
     mask = np.zeros(size, np.uint8)
     # eye_points_l = np.array(points[36:42], np.int32)
     # eye_points_r = np.array(points[42:48], np.int32)
@@ -203,6 +204,7 @@ def get_eye_region(size, mask_l, mask_r):
 
     # cv2.fillConvexPoly(mask, convexhull_eye_r, 255)
     # cv2.fillConvexPoly(mask, convexhull_eye_l, 255)
+    # print(mask_l.dtype, mask_l.shape)
 
     ret, threshl = cv2.threshold(mask_l, 50, 255, cv2.THRESH_BINARY)
     ret, threshr = cv2.threshold(mask_r, 50, 255, cv2.THRESH_BINARY)
@@ -219,10 +221,17 @@ def get_eye_region(size, mask_l, mask_r):
     center_l = ((r_l[0] + int(r_l[2] / 2), r_l[1] + int(r_l[3] / 2)))
     r_r = cv2.boundingRect(hull_r[0])
     center_r = ((r_r[0] + int(r_r[2] / 2), r_r[1] + int(r_r[3] / 2)))
-    radius = int(abs(r_l[0] - r_l[2]) // 4)
+    
+    corner_left_l = points[36]
+    corner_left_r = points[39]
+    corner_right_l = points[42]
+    corner_right_r = points[45]
 
-    circle_l = cv2.circle(mask, center_l, radius, (255, 255, 255), -1)
-    circle_r = cv2.circle(mask, center_r, radius, (255, 255, 255), -1)
+    r_left = int(math.sqrt((corner_left_l[0]- corner_left_r[0])**2 + (corner_left_l[1]- corner_left_r[1])**2) * 0.8)
+    r_right = int(math.sqrt((corner_right_l[0]- corner_right_r[0])**2 + (corner_right_l[1]- corner_right_r[1])**2) *0.8)
+
+    circle_l = cv2.circle(mask, center_l, r_left, (255, 255, 255), -1)
+    circle_r = cv2.circle(mask, center_r, r_right, (255, 255, 255), -1)
 
     return mask
 
@@ -284,74 +293,92 @@ def check_points(img,points):
     return False
 
 
-def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, end=68):
-    h, w = dst_face.shape[:2]
+def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, seg_dst, end=68):
+    h_face, w_face = dst_face.shape[:2]
+    h_img, w_img = dst_img.shape[:2]
 
-    ## 3d warp
-    warped_src_face = warp_image_3d(src_face, src_points[:end], dst_points[:end], (h, w))
-    cv2.imshow("warped_src_face", warped_src_face)
-    cv2.waitKey(0)
-    ## Mask for blending
-    mask = mask_from_points((h, w), dst_points)
-    mask_src = np.mean(warped_src_face, axis=2) > 0
-    mask = np.asarray(mask * mask_src, dtype=np.uint8)
-
-    lip_mask = get_lip_mask((h, w), dst_points)
-    lip_mask_src = np.mean(warped_src_face, axis=2) > 0
-    lip_mask = np.asarray(lip_mask * lip_mask_src, dtype=np.uint8)
-
-    ##Poisson Blending
-    r = cv2.boundingRect(mask)
-    center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
-    lip_r = cv2.boundingRect(lip_mask)
-    lip_center = ((lip_r[0] + int(lip_r[2] / 2), lip_r[1] + int(lip_r[3] / 2)))
-    
-    output = cv2.seamlessClone(warped_src_face, dst_face, mask, center, cv2.MIXED_CLONE)
-    output = cv2.seamlessClone(warped_src_face, output, lip_mask, lip_center, cv2.NORMAL_CLONE)
-
-    x, y, w, h = dst_shape
-    dst_img_cp = dst_img.copy()
-    dst_img_cp[y:y + h, x:x + w] = output
-
-    return dst_img_cp
-
-def get_mask(size, seg, classes_list):
-    mask = np.zeros(size).astype(np.uint8)
-    seg = seg.astype(np.uint8)
-    for i in classes_list:
-        mask[seg == i] = 255
-    return mask
-
-def getMakeupGroundTruth_warping(face_src, face_dst, seg_dst, points_src, points_dst):
-    h, w = face_dst.shape[:2]
-    end = 68
-    id_face = [1]
     id_brow = [2, 3]
     id_eye_l = [4]
     id_eye_r = [5]
     id_lip = [7, 9]
-    id_hair = [10]
 
-    warped_src_face = warp_image_3d(face_src, points_src[:end], points_dst[:end], (h, w))
-    face_mask = get_mask((h, w), seg_dst, id_face)
-    brow_mask = get_mask((h, w), seg_dst, id_brow)
-    lip_mask = get_mask((h, w), seg_dst, id_lip)
-    eyeball_mask_l = get_mask((h, w), seg_dst, id_eye_l)
-    eyeball_mask_r = get_mask((h, w), seg_dst, id_eye_r)
-    eye_mask = get_eye_region((h, w), eyeball_mask_l, eyeball_mask_r)
+    ## 3d warp
+    warped_src_face = warp_image_3d(src_face, src_points[:end], dst_points[:end], (h_face, w_face))
+    
+    ## Mask for blending
+    mask = mask_from_points((h_face, w_face), dst_points)
+    mask_src = np.mean(warped_src_face, axis=2) > 0
+    mask = np.asarray(mask * mask_src, dtype=np.uint8)
 
-
-    mask_copy = brow_mask + lip_mask + eye_mask
-    mask_blend = face_mask - mask_copy
-    mask_copy.reshape((h, w, 3))
-    seg_copy = np.asarray(mask_copy * warped_src_face, dtype=np.uint8)
-    seg_blend = np.asarray(mask_blend * warped_src_face, dtype=np.uint8)
-
-    mask = mask_from_points((h, w), points_dst)
+    ## Poisson Blending
     r = cv2.boundingRect(mask)
     center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
-    output = cv2.seamlessClone(warped_src_face, face_dst, mask_blend, center, cv2.MIXED_CLONE)
+    output = cv2.seamlessClone(warped_src_face, dst_face, mask, center, cv2.MIXED_CLONE)
 
-    output[seg_copy > 0] = seg_copy[seg_copy > 0]
+    brow_mask = get_mask((h_img, w_img), seg_dst, id_brow)
+    lip_mask = get_mask((h_img, w_img), seg_dst, id_lip)
+    eyeball_mask_l = get_mask((h_img, w_img), seg_dst, id_eye_l)
+    eyeball_mask_r = get_mask((h_img, w_img), seg_dst, id_eye_r)
+    eye_mask = get_eye_region((h_img, w_img), eyeball_mask_l, eyeball_mask_r, dst_points)
+    mask_copy = brow_mask + lip_mask + eye_mask
 
-    return output
+    x, y, w, h = dst_shape
+    warped_face = np.zeros_like(dst_img, dtype='uint8')
+    warped_face[y:y + h, x:x + w] = warped_src_face
+    seg_copy = cv2.bitwise_and(warped_face, warped_face, mask=mask_copy)
+
+    dst_img_cp = dst_img.copy()
+    dst_img_cp[y:y + h, x:x + w] = output
+    dst_img_cp[seg_copy > 0] = seg_copy[seg_copy > 0]
+    dst_img_cp[dst_img_cp == 0] = dst_img[dst_img_cp == 0]
+
+    return dst_img_cp
+
+
+def face_blend(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, end=68):
+    h_face, w_face = dst_face.shape[:2]
+
+    ## 3d warp
+    warped_src_face = warp_image_3d(src_face, src_points[:end], dst_points[:end], (h_face, w_face))
+    
+    ## Mask for blending
+    mask = mask_from_points((h_face, w_face), dst_points)
+    mask_src = np.mean(warped_src_face, axis=2) > 0
+    mask = np.asarray(mask * mask_src, dtype=np.uint8)
+    
+    ## Poisson Blending
+    r = cv2.boundingRect(mask)
+    center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
+    output = cv2.seamlessClone(warped_src_face, dst_face, mask, center, cv2.MIXED_CLONE)
+
+    x, y, w, h = dst_shape
+    warped_face = np.zeros_like(dst_img, dtype='uint8')
+    warped_face[y:y + h, x:x + w] = warped_src_face
+
+    gt_blend = dst_img.copy()
+    gt_blend[y:y + h, x:x + w] = output
+
+    return gt_blend
+
+def face_copy(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, copy_mask, end=68):
+    h_face, w_face = dst_face.shape[:2]
+
+    ## 3d warp
+    warped_src_face = warp_image_3d(src_face, src_points[:end], dst_points[:end], (h_face, w_face))
+    mask_copy = copy_mask
+
+    x, y, w, h = dst_shape
+    warped_face = np.zeros_like(dst_img, dtype='uint8')
+    warped_face[y:y + h, x:x + w] = warped_src_face
+    seg_copy = cv2.bitwise_and(warped_face, warped_face, mask=mask_copy)
+
+    gt_copy = dst_img.copy()
+    gt_copy[seg_copy > 0] = seg_copy[seg_copy > 0]
+
+    return gt_copy
+
+def get_mask(size, seg, classes_list):
+    mask = np.zeros(size, dtype=np.uint8)
+    for i in classes_list:
+        mask[seg == i] = 255
+    return mask

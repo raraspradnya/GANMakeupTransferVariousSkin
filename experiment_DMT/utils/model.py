@@ -9,7 +9,7 @@ from utils.module import *
 from utils.losses import *
 from utils.helper import *
 
-class NNModel(object):
+class Model_DMT(object):
     def __init__(self, input_shape, logs_path, batch_size = 32, classes = None):
         self.input_shape = input_shape
         self.batch_size = batch_size
@@ -17,6 +17,9 @@ class NNModel(object):
         self.logs_path = logs_path
         self.model_path = os.path.join(self.logs_path, 'checkpoint')
         self.pic_save_path = os.path.join(logs_path, 'save_pic')
+        self.gt_save_path = os.path.join(logs_path, 'save_gt')
+        self.bg_save_path = os.path.join(logs_path, 'save_bg')
+        self.loss_save_path = os.path.join(logs_path, 'metrics')
 
         # Define optimizer
         learning_rate_fn_1 = tf.keras.optimizers.schedules.PolynomialDecay(2e-4, 155250, 1e-6, power=1.0)
@@ -48,6 +51,7 @@ class NNModel(object):
 
         # mask
         makeup_mask = labels["makeup_mask"]
+        background_mask1 = labels["background_mask1"]
         attention_mask, transfer_mask = pred["mask"][0], pred["mask"][1]
         face_mask, brow_mask, eye_mask, lip_mask = labels["face_mask"], labels["brow_mask"], labels["eye_mask"], labels["lip_mask"]
     
@@ -78,6 +82,8 @@ class NNModel(object):
         # Attention loss
         attention_loss = Attention_loss(makeup_mask, attention_mask) + Attention_loss(makeup_mask, transfer_mask) 
         attention_loss = attention_loss * 10
+        source_background = image1_true * background_mask1
+        transfer_background = transfer_images * background_mask1
 
         # Adversarial Loss
         adversarial_loss = Adversarial_loss(dis_fake_output)
@@ -92,10 +98,10 @@ class NNModel(object):
         tv_loss = tv_loss * 0.0001
 
         loss = reconsructed_loss + perceptual_loss + makeup_loss + IMRL_loss + attention_loss + adversarial_loss + kl_loss + tv_loss
-        return loss,  [reconsructed_loss, perceptual_loss, makeup_loss, IMRL_loss, attention_loss, adversarial_loss, kl_loss, tv_loss]
+        return loss,  [reconsructed_loss, perceptual_loss, makeup_loss, IMRL_loss, attention_loss, adversarial_loss, kl_loss, tv_loss], [source_background, transfer_background]
 
     def build_identity_encoder(self):
-        print("[Model] Building Identity Encoder....")
+        print("[Model DMT] Building Identity Encoder....")
         image = tf.keras.layers.Input(self.input_shape)
         x = image
 
@@ -122,7 +128,7 @@ class NNModel(object):
         return model
 
     def build_makeup_encoder(self):
-        print("[Model] Building Makeup Encoder....")
+        print("[Model DMT] Building Makeup Encoder....")
         image = tf.keras.layers.Input(self.input_shape)
         x = image
 
@@ -146,7 +152,7 @@ class NNModel(object):
         return model
 
     def build_context_encoder(self):
-        print("[Model] Building Context Encoder....")
+        print("[Model DMT] Building Context Encoder....")
         makeup_code = tf.keras.layers.Input((8,)) 
 
         x = Dense_layer(makeup_code, units = 32)
@@ -161,8 +167,8 @@ class NNModel(object):
         return model
 
     def build_generator(self):
-        print("[Model] Building Generator....")
-        identity_code = tf.keras.layers.Input((56, 56, 256))
+        print("[Model DMT] Building Generator....")
+        identity_code = tf.keras.layers.Input((64, 64, 256))
         hidden_code1 = tf.keras.layers.Input((8,)) 
         hidden_code2 = tf.keras.layers.Input((8,))
 
@@ -197,7 +203,7 @@ class NNModel(object):
         return model
 
     def build_discriminator(self):
-        print("[Model] Building Discriminator....")
+        print("[Model DMT] Building Discriminator....")
         image = tf.keras.layers.Input(self.input_shape)
 
         x = image
@@ -218,7 +224,7 @@ class NNModel(object):
         return model
 
     def build(self, isLoadWeight = False):
-        print("[Model] Building Train Model....")
+        print("[Model DMT] Building Train Model....")
         # Training flow
         image1 = tf.keras.layers.Input(self.input_shape, name = "images1")
         image2 = tf.keras.layers.Input(self.input_shape, name = "images2") 
@@ -272,7 +278,7 @@ class NNModel(object):
             fake_output1 = self.discriminator(pred["fake_images"], training=True)
             fake_output2 = self.discriminator(pred["transfer_images"], training=True)
 
-            gen_loss, loss_list = self.loss_function(pred, labels, [fake_output1, fake_output2])
+            gen_loss, loss_list, bg_images = self.loss_function(pred, labels, [fake_output1, fake_output2])
             dis_loss = Discriminator_loss(real_output, [fake_output1, fake_output2])
 
         gradients_of_generator = gen_tape.gradient(gen_loss, self.model.trainable_variables)
@@ -280,43 +286,51 @@ class NNModel(object):
 
         self.model_optimizer.apply_gradients(zip(gradients_of_generator, self.model.trainable_variables))
         self.discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, self.discriminator.trainable_variables))
-        return gen_loss, dis_loss, pred["transfer_images"], loss_list
+        return gen_loss, dis_loss, pred["image"], bg_images, loss_list
 
     def train(self, train_dataset, epochs = 500, pretrained_model_path = None):
         os.makedirs(self.logs_path, exist_ok = True)
         os.makedirs(self.model_path, exist_ok = True)
         os.makedirs(self.pic_save_path, exist_ok = True)
+        os.makedirs(self.gt_save_path, exist_ok = True)
+        os.makedirs(self.bg_save_path, exist_ok = True)
+        os.makedirs(self.loss_save_path, exist_ok = True)
 
         train_step = len(train_dataset) // self.batch_size
         dataset = train_dataset.flow()
 
-        if(pretrained_model_path != None):
-            self.load_model(self.model, pretrained_model_path)
+        current_epoch = 0
 
-        print("[Model] Training....")
+        if(pretrained_model_path != None):
+            current_epoch = self.load_model(self.model, pretrained_model_path)
+
+        print("[Model DMT] Training....")
         
 
         for epoch in range(epochs):
             step = 0
+            epoch_num = epoch + 1 + current_epoch
             for batch_features, batch_labels in dataset:
-                gen_loss, dis_loss, transfer_images, loss_list = self.train_step(batch_features, batch_labels)
+                gen_loss, dis_loss, pred_images, bg_images, loss_list = self.train_step(batch_features, batch_labels)
 
                 step += 1
                 if(step % 10 == 0):
-                    print ('epoch {0:04d} : gen loss : {1:.6f}, dis loss : {2:.6f}'.format(epoch + 1, gen_loss.numpy(), dis_loss.numpy()))
-                    print('rec : {:.3f}, per : {:.3f}, makeup : {:.3f}, IMRL : {:.3f}, attenton : {:.3f}, adversarial : {:.3f}, kl : {:.3f}, tv : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy(), loss_list[5].numpy(), loss_list[6].numpy(), loss_list[7].numpy()))
+                    print('step : {0:04d}'.format(step))
+                    print ('epoch {0:04d} : gen loss : {1:.6f}, dis loss : {2:.6f}'.format(epoch_num, gen_loss.numpy(), dis_loss.numpy()))
+                    print('rec : {:.3f}, per : {:.3f}, makeup : {:.3f}, IMRL : {:.3f}, attention : {:.3f}, adversarial : {:.3f}, kl : {:.3f}, tv : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy(), loss_list[5].numpy(), loss_list[6].numpy(), loss_list[7].numpy()))
                 if(step % 200 == 0):
-                    save_images(epoch + 1, step, batch_features["images1"].numpy(), transfer_images.numpy(), batch_features["images2"].numpy(), self.pic_save_path)
-                    save_images(epoch + 1, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), os.path.join(self.logs_path, 'save_gt'))
+                    save_images(epoch_num, step, batch_features["images1"].numpy(), pred_images[0].numpy(), batch_features["images2"].numpy(), self.pic_save_path)
+                    save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[1].numpy(), pred_images[1].numpy(), self.bg_save_path)
+                    save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step == train_step):
                     break
             # if (epoch + 1) % 5 == 0:
-            model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch + 1))
+            model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch_num))
             self.save_model(self.model, model_path)
-            log(epoch, gen_loss, dis_loss, loss_list)
+            log(epoch_num, gen_loss, dis_loss, loss_list, self.loss_save_path)
        
     def export_model(self, save_model_path, export_path):
-        print("[Model] Exporting Model....")
+        print("[Model DMT] Exporting Model....")
         self.load_model(self.model, save_model_path)
 
         # Makeup Encoder
@@ -348,8 +362,10 @@ class NNModel(object):
 
     def save_model(self, model, model_path):
         model.save_weights(model_path)
-        print('[Model] Save weights to {}.'.format(model_path))
+        print('[Model DMT] Save weights to {}.'.format(model_path))
 
     def load_model(self, model, model_path):
         model.load_weights(model_path)
-        print('[Model] Load weights from {}.'.format(model_path))
+        print('[Model DMT] Load weights from {}.'.format(model_path))
+        current_epoch = int(model_path[19:-5])
+        return current_epoch

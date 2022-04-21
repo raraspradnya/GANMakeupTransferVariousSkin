@@ -158,11 +158,10 @@ def eye_regions_func(mask):
     horizontal = horizontal_n * horizontal_r
     return (vertical * horizontal)
 
-def log(epoch, gen_loss, dis_loss, loss_list):
-    logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-    file_writer = tf.summary.create_file_writer(logdir + "/metrics")
+def log(epoch, gen_loss, dis_loss, loss_list, loss_save_path):
+    file_writer = tf.summary.create_file_writer(loss_save_path)
     file_writer.set_as_default()
-    tf.summary.scalar('Epoch', epoch +1, step=epoch)
+    tf.summary.scalar('Epoch', epoch, step=epoch)
     tf.summary.scalar('Generator Loss', gen_loss.numpy(), step=epoch)
     tf.summary.scalar('Discriminator Loss', dis_loss.numpy(), step=epoch)
     tf.summary.scalar('Reconstruction Loss', loss_list[0].numpy(), step=epoch)

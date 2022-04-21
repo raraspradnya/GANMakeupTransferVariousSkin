@@ -9,7 +9,7 @@ from skimage.exposure import match_histograms
 import copy
 
 from face_detection import select_face, select_all_faces
-from face_swap import face_swap, getMakeupGroundTruth_warping
+from face_swap import face_swap
 from face_parsing import get_face
 
 id_face = [1, 6, 11, 12, 13]
@@ -40,7 +40,6 @@ def masking_func(mask, classes_list):
 def process_mask(mask):
     mask = mask.numpy().astype(np.uint8)
     mask[mask > 0] = 255
-    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
     return mask
 
 def cal_trans(ref, adj):
@@ -177,7 +176,6 @@ def getMakeupGroundTruth_histogram(images, masks, reference_images, reference_ma
     eye_masks = process_mask(eye_masks)
     lip_masks = process_mask(lip_masks)
 
-    hair_index = np.where(hair_masks > 0)
     face_index = np.where(face_masks > 0)
     brow_index = np.where(brow_masks > 0)
     eye_index = np.where(eye_masks > 0)
@@ -249,9 +247,9 @@ if __name__ == '__main__':
     # seg_nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/non-makeup/"
 
     makeup.append(makeup_directory + "12.png")
-    # makeup.append(makeup_directory + "94.png")
-    # makeup.append(makeup_directory + "1635.png")
-    # makeup.append(makeup_directory + "103.png")
+    makeup.append(makeup_directory + "94.png")
+    makeup.append(makeup_directory + "1635.png")
+    makeup.append(makeup_directory + "103.png")
     seg_makeup.append(seg_makeup_directory + "12.png")
     seg_makeup.append(seg_makeup_directory + "94.png")
     seg_makeup.append(seg_makeup_directory + "1635.png")
@@ -259,11 +257,11 @@ if __name__ == '__main__':
 
     non_makeup.append(nonmakeup_directory + "vSYYZ25.png")
     non_makeup.append(nonmakeup_directory + "vSYYZ51.png")
-    non_makeup.append(nonmakeup_directory + "vSYYZ25.png")
+    non_makeup.append(nonmakeup_directory + "xfsy_0398.png")
     non_makeup.append(nonmakeup_directory + "vSYYZ663.png")
     seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ25.png")
     seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ51.png")
-    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ25.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "xfsy_0398.png")
     seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ663.png")
 
     for i in range (len(makeup)):
@@ -300,10 +298,8 @@ if __name__ == '__main__':
         else:
             output = dst_img
             for k, dst_face in dst_faceBoxes.items():
-                output = getMakeupGroundTruth_warping(src_face, dst_img, seg_dst_img, src_points, dst_face["points"])
-                # output = face_swap(src_face, dst_face["face"], src_points,
-                #                 dst_face["points"], dst_face["shape"],
-                #                 output)
+                # output = getMakeupGroundTruth_warping(src_face, dst_face["face"], dst_face["shape"], seg_dst_img, src_points, dst_face["points"], dst_img)
+                output = face_swap(src_face, dst_face["face"], src_points, dst_face["points"], dst_face["shape"], output, seg_dst_img)
             output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
             images = [src_img, dst_img, output]
             new_im = cv2.hconcat(images)
@@ -328,8 +324,10 @@ if __name__ == '__main__':
         brow_true[brow_true == 0] = eye_true[brow_true == 0]
         brow_true[brow_true == 0] = face_true[brow_true == 0]
         brow_true[brow_true == 0] = dst_img[brow_true == 0]
+        
+        output2 = cv2.resize(brow_true, dim, interpolation = cv2.INTER_AREA)
+        images2 = [src_img, dst_img, output2]
+        new_im2 = cv2.hconcat(images2)
+        cv2.imwrite(img_path2, new_im2)
+        print(img_path2)
 
-        cv2.imshow("src", src_img)
-        cv2.imshow("dst", dst_img)
-        cv2.imshow("result histogram", brow_true)
-        cv2.waitKey(0)

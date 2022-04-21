@@ -33,6 +33,7 @@ import matplotlib.pyplot as plt
 (17, 'hair') 
 (18, 'hat')
 
+FIX
 0 background, 
 1 face,
 2 left / 

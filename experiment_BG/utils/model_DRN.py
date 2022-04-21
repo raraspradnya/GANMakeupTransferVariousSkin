@@ -252,6 +252,7 @@ class Model_DRN(object):
         for epoch in range(epochs):
             step = 0
             epoch_num = epoch + 1 + current_epoch
+            
             for batch_features, batch_labels in dataset:
 
                 gen_loss, dis_loss_X, dis_loss_Y, transfer_image, bg_images, loss_list = self.train_step(batch_features, batch_labels)
@@ -260,6 +261,7 @@ class Model_DRN(object):
                     print("step : {:d}".format(step))
                     print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch_num, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
+                    save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
                 if(step % 200 == 0):
                     save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_features["images2"].numpy(), self.pic_save_path)
                     save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[1].numpy(), transfer_image[1].numpy(), self.bg_save_path)
