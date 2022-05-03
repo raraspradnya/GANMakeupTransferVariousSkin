@@ -167,7 +167,7 @@ class Dataset(object):
         # return data
         data = {'images1' : images1, 'images2' : images2}
         labels = {'images1' : images1, 'images2' : images2, 'background_mask1' : background_mask1, 'makeup_mask' : makeup_mask1,
-                'face_true' : makeup_true[0], 'brow_true' : makeup_true[1], 'eye_true' : makeup_true[2], 'lip_true' : makeup_true[3],
+                'face_true' : makeup_true[0], 'brow_true' : makeup_true[1], 'eye_true' : makeup_true[2], 'lip_true' : makeup_true[3], 'whole_face_true' : makeup_true[4], 
                 'face_mask' : makeup_masks[0], 'brow_mask' : makeup_masks[1], 'eye_mask' : makeup_masks[2], 'lip_mask' : makeup_masks[3],
                 }
         return data, labels
@@ -186,7 +186,7 @@ class Dataset(object):
 
         # repeat and shuffle
         if(self.isTraining):
-            dataset1 = dataset1.repeat(3)
+            dataset1 = dataset1.repeat()
             dataset1 = dataset1.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
             dataset2 = dataset2.repeat()
             dataset2 = dataset2.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
@@ -201,7 +201,7 @@ class Dataset(object):
         if(self.isTraining):
             dataset1 = dataset1.map(map_func = self.augmentData, num_parallel_calls = NUM_PARALLEL_CALLS)
             dataset2 = dataset2.map(map_func = self.augmentData, num_parallel_calls = NUM_PARALLEL_CALLS)
-
+                                    
         # prerocessing a batch of data
         dataset = tf.data.Dataset.zip((dataset1, dataset2)) 
         dataset = dataset.map(map_func = self.preprocessData, num_parallel_calls = NUM_PARALLEL_CALLS)
@@ -235,6 +235,7 @@ class Dataset(object):
 
         # get source mask of each source makeup region
         hair_masks = masking_func(masks, tf.constant(self.classes["hair"], dtype = tf.int32))
+        whole_face_masks = masking_func(masks, tf.constant(self.classes["whole_face"], dtype = tf.int32))
         face_masks = masking_func(masks, tf.constant(self.classes["face"], dtype = tf.int32))
         brow_masks = masking_func(masks, tf.constant(self.classes["brow"], dtype = tf.int32))
         eyeball_masks_l = masking_func(masks, tf.constant(self.classes["eyeball_l"], dtype = tf.int32))
@@ -242,32 +243,37 @@ class Dataset(object):
         lip_masks = masking_func(masks, tf.constant(self.classes["lip"], dtype = tf.int32))
         eye_masks = tf.py_function(get_eye_region, inp=[(h, w), eyeball_masks_l, eyeball_masks_r], Tout=tf.float32)
         eye_masks = tf.expand_dims(eye_masks, -1)
+        eye_masks = tf.clip_by_value(eye_masks, 0, 1)
+        lip_masks = tf.clip_by_value(lip_masks, 0, 1)
+        whole_face_masks = tf.clip_by_value(whole_face_masks, 0, 1)
 
         # Get ground truth
         mask_copy = tf.clip_by_value(eye_masks + brow_masks + lip_masks, 0, 1)
-        whole_face_blend = tf.py_function(warping_blend, inp=[images, r_whole_face], Tout = tf.float32)
-        whole_face_copy = tf.py_function(warping_copy, inp=[images, r_whole_face, mask_copy], Tout = tf.float32)
-        eye_masks2 = tf.clip_by_value(eye_masks - eyeball_masks_l - eyeball_masks_r, 0, 1)
+        whole_face_blend = tf.py_function(warping_blend, inp=[images, r_whole_face, lip_masks], Tout = tf.float32)
 
         face_true = whole_face_blend * face_masks
-        brow_true = whole_face_copy * brow_masks
-        eye_true = whole_face_copy * eye_masks2
-        lip_true = whole_face_copy * lip_masks
+        brow_true = whole_face_blend * brow_masks
+        eye_true = whole_face_blend * eye_masks
+        lip_true = whole_face_blend * lip_masks
+        whole_face_true = whole_face_blend * whole_face_masks
 
         face_true.set_shape((self.batch_size, h , w, c))
         brow_true.set_shape((self.batch_size, h , w, c))
         eye_true.set_shape((self.batch_size, h , w, c))
         lip_true.set_shape((self.batch_size, h , w, c))
+        whole_face_true.set_shape((self.batch_size, h , w, c))
 
         # normalize ground truth
         face_true = self.preprocess(face_true)
         brow_true = self.preprocess(brow_true)
         eye_true = self.preprocess(eye_true)
+        whole_face_true = self.preprocess(whole_face_true)
         lip_true = self.preprocess(lip_true)
 
         # prevent background form changing
         face_true = face_true * face_masks
         brow_true = brow_true * brow_masks
-        eye_true = eye_true * eye_masks2
+        eye_true = eye_true * eye_masks
         lip_true = lip_true * lip_masks
-        return [face_true, brow_true, eye_true, lip_true], [face_masks, brow_masks, eye_masks2, lip_masks]
+        whole_face_true = whole_face_true * whole_face_masks
+        return [face_true, brow_true, eye_true, lip_true, whole_face_true], [face_masks, brow_masks, eye_masks, lip_masks]

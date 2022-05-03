@@ -5,7 +5,7 @@ import tensorflow_addons as tfa
 
 class FaceBeautyModel(object):
     def __init__(self):
-        self.generator_model_path = "../export_models/DRN/Generator.h5"
+        self.generator_model_path = "../export_models/BG137_FIX/Generator.h5"
         self.Generator = self.loadGenerator()
         self.Generator.compile()
 

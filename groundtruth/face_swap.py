@@ -6,6 +6,8 @@ import scipy.spatial as spatial
 import logging
 import matplotlib.pyplot as plt
 import math
+from PIL import Image, ImageEnhance
+
 
 ## 3D Transform
 def bilinear_interpolate(img, coords):
@@ -335,7 +337,7 @@ def face_swap(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, se
     return dst_img_cp
 
 
-def face_blend(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, end=68):
+def face_blend(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, copy_mask, end=68):
     h_face, w_face = dst_face.shape[:2]
 
     ## 3d warp
@@ -345,18 +347,29 @@ def face_blend(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, e
     mask = mask_from_points((h_face, w_face), dst_points)
     mask_src = np.mean(warped_src_face, axis=2) > 0
     mask = np.asarray(mask * mask_src, dtype=np.uint8)
+    mask = ImageEnhance.Contrast(mask)
     
     ## Poisson Blending
+    x, y, w, h = dst_shape
     r = cv2.boundingRect(mask)
     center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
     output = cv2.seamlessClone(warped_src_face, dst_face, mask, center, cv2.MIXED_CLONE)
-
-    x, y, w, h = dst_shape
-    warped_face = np.zeros_like(dst_img, dtype='uint8')
-    warped_face[y:y + h, x:x + w] = warped_src_face
-
     gt_blend = dst_img.copy()
     gt_blend[y:y + h, x:x + w] = output
+
+    # # BLEND LIPS
+    lip_r = cv2.boundingRect(copy_mask)
+    lip_center = ((lip_r[0] + int(lip_r[2] / 2), lip_r[1] + int(lip_r[3] / 2)))
+    warped_face = np.zeros_like(dst_img, dtype='uint8')
+    warped_face[y:y + h, x:x + w] = warped_src_face
+    output = cv2.seamlessClone(warped_face, gt_blend, copy_mask, lip_center, cv2.NORMAL_CLONE)
+   
+    # # LIPS NOT BLENDED
+    # x, y, w, h = dst_shape
+    # warped_face = np.zeros_like(dst_img, dtype='uint8')
+    # warped_face[y:y + h, x:x + w] = warped_src_face
+    # seg_copy = cv2.bitwise_and(warped_face, warped_face, mask=copy_mask)
+    # gt_blend[seg_copy > 0] = seg_copy[seg_copy > 0]
 
     return gt_blend
 

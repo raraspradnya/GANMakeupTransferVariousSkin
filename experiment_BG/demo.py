@@ -6,7 +6,7 @@ import numpy as np
 
 from API import FaceBeautyModel
 
-output_path = "Transfer_1"
+output_path = "Transfer_BG137_fix"
 images_path = "..\\dataset\\RawData\\images\\non-makeup\\*"
 reference_image_path = "..\\dataset\\RawData\\images\\makeup\\*"
 

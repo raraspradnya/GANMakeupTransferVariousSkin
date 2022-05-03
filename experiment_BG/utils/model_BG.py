@@ -1,4 +1,5 @@
 import os
+from re import X
 import cv2
 import shutil
 import threading
@@ -97,18 +98,24 @@ class Model_BG(object):
 
         # DOWNSAMPLING BRANCH
         # SOURCE BRANCH
-        x = Conv2D_layer(image_source, filters = 64, kernel_size = (7, 7), strides=(2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(3, 3))(image_source)
+        x = Conv2D_layer(x, filters = 64, kernel_size = (7, 7), strides=(1, 1), padding='valid')
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
-        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2,2))
+
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2, 2), padding='valid')
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
 
         # REFERENCE BRANCH
-        y = Conv2D_layer(image_reference, filters = 64, kernel_size = (7, 7), strides=(2, 2))
+        y = tf.keras.layers.ZeroPadding2D(padding=(3, 3))(image_reference)
+        y = Conv2D_layer(y, filters = 64, kernel_size = (7, 7), strides=(1, 1), padding='valid')
         y = InstanceNormalization_layer(y)
-        y = ReLU_layer(y)
-        y = Conv2D_layer(y, filters = 128, kernel_size = (4, 4), strides=(2,2))
+        y = ReLU_layer(y) 
+
+        y = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(y)
+        y = Conv2D_layer(y, filters = 128, kernel_size = (4, 4), strides=(2, 2), padding='valid')
         y = InstanceNormalization_layer(y)
         y = ReLU_layer(y)
 
@@ -116,44 +123,59 @@ class Model_BG(object):
         x = Concatenate_layer(x, y, axis=3)
 
         # DOWNSAMPLING
-        x = Conv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = Conv2D_layer(x, filters = 256, kernel_size = (4, 4), strides=(2, 2), padding='valid')
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
 
         # RESIDUAL BLOCK
         for i in range(6):
-            x = Conv2D_layer(x, filters = 256, kernel_size = (3, 3))
-            x = InstanceNormalization_layer(x)
-            x = ReLU_layer(x)
+            x_in = x
+            x_out = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x_in)
+            x_out = Conv2D_layer(x_out, filters = 256, kernel_size = (3, 3), strides=(1, 1), padding='valid')
+            x_out = InstanceNormalization_layer(x_out)
+            x_out = ReLU_layer(x_out)
+            x = tf.keras.layers.Add()([x_in, x_out])
 
         # UPSAMPLING
-        x = DeConv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2, 2))
+        # x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = DeConv2D_layer(x, filters = 128, kernel_size = (4, 4), strides=(2, 2), padding='same')
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
-        x = DeConv2D_layer(x, filters = 64, kernel_size = (4, 4), strides=(2, 2))
-        x = InstanceNormalization_layer(x)
-        x = ReLU_layer(x)
-        x = DeConv2D_layer(x, filters = 32, kernel_size = (4, 4), strides=(2, 2))
+
+        # x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = DeConv2D_layer(x, filters = 64, kernel_size = (4, 4), strides=(2, 2), padding='same')
         x = InstanceNormalization_layer(x)
         x = ReLU_layer(x)
 
         # UPSAMPLING BRANCH
-        res_source = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+        res_source = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        res_source = Conv2D_layer(res_source, filters = 64, kernel_size = (3, 3), strides=(1, 1), padding='valid')
         res_source = InstanceNormalization_layer(res_source)
         res_source = ReLU_layer(res_source)
-        res_source = Conv2D_layer(res_source, filters = 64, kernel_size = (3, 3))
+
+        res_source = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(res_source)
+        res_source = Conv2D_layer(res_source, filters = 64, kernel_size = (3, 3), strides=(1, 1), padding='valid')
         res_source = InstanceNormalization_layer(res_source)
         res_source = ReLU_layer(res_source)
-        res_source = Conv2D_layer(res_source, filters = 3, kernel_size = (7, 7))
+
+        res_source = tf.keras.layers.ZeroPadding2D(padding=(3, 3))(res_source)
+        res_source = Conv2D_layer(res_source, filters = 3, kernel_size = (7, 7), strides=(1, 1), padding='valid')
         res_source = tf.nn.tanh(res_source)
 
-        res_reference = Conv2D_layer(x, filters = 64, kernel_size = (3, 3))
+
+        res_reference = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        res_reference = Conv2D_layer(res_reference, filters = 64, kernel_size = (3, 3), strides=(1, 1), padding='valid')
         res_reference = InstanceNormalization_layer(res_reference)
         res_reference = ReLU_layer(res_reference)
-        res_reference = Conv2D_layer(res_reference, filters = 64, kernel_size = (3, 3))
+
+        res_reference = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(res_reference)
+        res_reference = Conv2D_layer(res_reference, filters = 64, kernel_size = (3, 3), strides=(1, 1), padding='valid')
         res_reference = InstanceNormalization_layer(res_reference)
         res_reference = ReLU_layer(res_reference)
-        res_reference = Conv2D_layer(res_reference, filters = 3, kernel_size = (7, 7))
+
+        res_reference = tf.keras.layers.ZeroPadding2D(padding=(3, 3))(res_reference)
+        res_reference = Conv2D_layer(res_reference, filters = 3, kernel_size = (7, 7), strides=(1, 1), padding='valid')
         res_reference = tf.nn.tanh(res_reference)
 
         model = tf.keras.Model(inputs = [image_source, image_reference], outputs = [res_source, res_reference])
@@ -165,15 +187,20 @@ class Model_BG(object):
         image = tf.keras.layers.Input(self.input_shape)
 
         x = image
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2), padding='valid')
         x = LeakyReLU_layer(x)
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2), padding='valid')
         x = LeakyReLU_layer(x)
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2), padding='valid')
         x = LeakyReLU_layer(x)
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 512, kernel_size = (4, 4))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 512, kernel_size = (4, 4), padding='valid')
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3), padding='valid')
         x = tf.nn.sigmoid(x)
 
         model = tf.keras.Model(inputs = image, outputs = x)
@@ -185,15 +212,20 @@ class Model_BG(object):
         image = tf.keras.layers.Input(self.input_shape)
 
         x = image
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 64, kernel_size = (4, 4), strides = (2, 2), padding='valid')
         x = LeakyReLU_layer(x)
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 128, kernel_size = (4, 4), strides = (2, 2), padding='valid')
         x = LeakyReLU_layer(x)
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 256, kernel_size = (4, 4), strides = (2, 2), padding='valid')
         x = LeakyReLU_layer(x)
-        x = SpectrumNormalization_Conv2D_Layer(x, filters = 512, kernel_size = (4, 4))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = SpectrumNormalization_Conv2D_Layer(x, filters = 512, kernel_size = (4, 4), padding='valid')
         x = LeakyReLU_layer(x)
-        x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3))
+        x = tf.keras.layers.ZeroPadding2D(padding=(1, 1))(x)
+        x = Conv2D_layer(x, filters = 1, kernel_size = (3, 3), padding='valid')
         x = tf.nn.sigmoid(x)
 
         model = tf.keras.Model(inputs = image, outputs = x)
@@ -276,10 +308,12 @@ class Model_BG(object):
                     print('step : {0:04d}'.format(step))
                     print('epoch : {0:04d}, gen loss : {1:.6f}, dis X loss : {2:.6f}, dis Y loss : {2:.6f}'.format(epoch_num, gen_loss.numpy(), dis_loss_X.numpy(), dis_loss_Y.numpy()))
                     print('adversarial : {:.3f}, cycle : {:.3f}, per : {:.3f}, makeup : {:.3f}, background : {:.3f}'.format(loss_list[0].numpy(), loss_list[1].numpy(), loss_list[2].numpy(), loss_list[3].numpy(), loss_list[4].numpy()))
+                    save_images(epoch_num, step, self.batch_size, [batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_labels["whole_face_true"].numpy(), batch_features["images2"].numpy(), transfer_image[1].numpy()], self.pic_save_path)
+
                 if(step % 200 == 0):
-                    save_images(epoch_num, step, batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_features["images2"].numpy(), self.pic_save_path)
-                    save_images(epoch_num, step, batch_features["images1"].numpy(), bg_images[1].numpy(), transfer_image[1].numpy(), self.bg_save_path)
-                    save_images(epoch_num, step, batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy(), self.gt_save_path)
+                    save_images(epoch_num, step, self.batch_size, [batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_labels["whole_face_true"].numpy(), batch_features["images2"].numpy(), transfer_image[1].numpy()], self.pic_save_path)
+                    # save_images(epoch_num, step, self.batch_size, [batch_features["images1"].numpy(), bg_images[1].numpy()],  self.bg_save_path)
+                    # save_images(epoch_num, step, self.batch_size, [batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy()], self.gt_save_path)
                 if(step == train_step):
                     break
             model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch_num))

@@ -14,3 +14,6 @@ groundtruth/coba/warping_1.png
 groundtruth/coba/warping_2.png
 groundtruth/coba/warping_3.png
 groundtruth/coba/warping_0.png
+experiment_BG/Transfer_BG100/
+experiment_BG/Transfer_DRN150/
+experiment_BG/Transfer_BG137_fix/

@@ -12,31 +12,18 @@ from groundtruth.face_detection import select_face, select_all_faces
 from groundtruth.face_swap import face_blend, face_copy
 
 fig = plt.figure(figsize=(10,15))
-def save_images(epoch, step, origin_images, pred_images, reference_images, pic_save_path):
+def save_images(epoch, step, batch_size, images, pic_save_path):
     pos = 0
-    for i in range(2):
-        # origin image
-        rgb_image = (origin_images[i][...,::-1] / 2 + 0.5) * 255.0 
-        rgb_image = rgb_image.astype(np.uint8)
-        plt.subplot(2, 3, pos+1)
-        plt.imshow(rgb_image)
-        plt.axis('off')
-
-        # pred image
-        rgb_image = (pred_images[i][...,::-1] / 2 + 0.5) * 255.0
-        rgb_image = rgb_image.astype(np.uint8)
-        plt.subplot(2, 3, pos+2)
-        plt.imshow(rgb_image)
-        plt.axis('off')
-
-        # reference image
-        rgb_image = (reference_images[i][...,::-1] / 2 + 0.5) * 255.0
-        rgb_image = rgb_image.astype(np.uint8)
-        plt.subplot(2, 3, pos+3)
-        plt.imshow(rgb_image)
-        plt.axis('off')
-
-        pos += 3
+    nrows = batch_size
+    ncols = len(images)
+    for i in range(batch_size):
+        for j in range(len(images)):
+            rgb_image = (images[j][i][...,::-1] / 2 + 0.5) * 255.0 
+            rgb_image = rgb_image.astype(np.uint8)
+            plt.subplot(nrows, ncols, pos+j+1)
+            plt.imshow(rgb_image)
+            plt.axis('off')
+        pos += len(images)
     save_path = os.path.join(pic_save_path, 'epoch_{:04d}_{:04d}.png'.format(epoch, step))
     save_path = os.path.normpath(save_path)
     plt.savefig(save_path)
@@ -95,7 +82,7 @@ def hist_match_func(source, reference):
     result = np.array(result, dtype=np.float32)
     return result
 
-def warping_blend(source, reference):
+def warping_blend(source, reference, mask_copy):
     '''
         Warp reference (makeup face) to source image (non-makeup face)
         input:
@@ -111,12 +98,14 @@ def warping_blend(source, reference):
     batch_size = oldshape[0]
     source = np.array(source, dtype = np.uint8)
     reference = np.array(reference, dtype = np.uint8)
+    mask_copy = np.array(mask_copy, dtype = np.uint8)
 
     # counts
     result = np.zeros(oldshape, dtype = np.uint8)
     for i in range(batch_size):
         s = source[i]
         r = reference[i]
+        copy = mask_copy[i]
         ref_points, ref_shape, ref_face, check = select_face(r)
         if (check ==  0):
             return source
@@ -125,7 +114,7 @@ def warping_blend(source, reference):
         for k, src_face in src_faceBoxes.items():
             result[i] = (face_blend(ref_face, src_face["face"], ref_points,
                             src_face["points"], src_face["shape"],
-                            output))
+                            output, copy))
     result = np.array(result, dtype = np.float32)
     return result
 
@@ -179,28 +168,38 @@ def get_eye_region(size, mask_l, mask_r):
         mask_left[mask_left > 0] = 255
         mask_right[mask_right > 0] = 255
         eyeball_mask[eyeball_mask > 0] = 255
+        r_l = cv2.boundingRect(mask_left)
+        center_l = ((r_l[0] + int(r_l[2] / 2), r_l[1] + int(r_l[3] / 2)))
+        r_left = int(math.sqrt(r_l[2]**2 + r_l[3]**2) * 0.9)
+        circle_l = cv2.circle(mask, center_l, r_left, (255, 255, 255), -1)
 
-        ret, threshl = cv2.threshold(mask_left, 50, 255, cv2.THRESH_BINARY)
-        ret, threshr = cv2.threshold(mask_right, 50, 255, cv2.THRESH_BINARY)
-        contoursl, hierarchy = cv2.findContours(threshl, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contoursr, hierarchy = cv2.findContours(threshr, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        hull_l = []
-        hull_r = []
-        for i in range(len(contoursl)):
-            hull_l.append(cv2.convexHull(contoursl[i], False))
-        for i in range(len(contoursr)):
-            hull_r.append(cv2.convexHull(contoursr[i], False))
+        r_r = cv2.boundingRect(mask_right)
+        center_r = ((r_r[0] + int(r_r[2] / 2), r_r[1] + int(r_r[3] / 2)))
+        r_right = int(math.sqrt(r_r[2]**2 + r_r[3]**2) * 0.9)
+        circle_r = cv2.circle(mask, center_r, r_right, (255, 255, 255), -1)
 
-        if (len(hull_l) > 0):
-            r_l = cv2.boundingRect(hull_l[0])
-            center_l = ((r_l[0] + int(r_l[2] / 2), r_l[1] + int(r_l[3] / 2)))
-            r_left = int(math.sqrt(r_l[2]**2 + r_l[3]**2) * 0.8)
-            circle_l = cv2.circle(mask, center_l, r_left, (255, 255, 255), -1)
-        if (len(hull_r) > 0):
-            r_r = cv2.boundingRect(hull_r[0])
-            center_r = ((r_r[0] + int(r_r[2] / 2), r_r[1] + int(r_r[3] / 2)))
-            r_right = int(math.sqrt(r_r[2]**2 + r_r[3]**2) * 0.8)
-            circle_r = cv2.circle(mask, center_r, r_right, (255, 255, 255), -1)
+
+        # ret, threshl = cv2.threshold(mask_left, 50, 255, cv2.THRESH_BINARY)
+        # ret, threshr = cv2.threshold(mask_right, 50, 255, cv2.THRESH_BINARY)
+        # contoursl, hierarchy = cv2.findContours(threshl, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # contoursr, hierarchy = cv2.findContours(threshr, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # hull_l = []
+        # hull_r = []
+        # for i in range(len(contoursl)):
+        #     hull_l.append(cv2.convexHull(contoursl[i], False))
+        # for i in range(len(contoursr)):
+        #     hull_r.append(cv2.convexHull(contoursr[i], False))
+
+        # if (len(hull_l) > 0):
+        #     r_l = cv2.boundingRect(hull_l[0])
+        #     center_l = ((r_l[0] + int(r_l[2] / 2), r_l[1] + int(r_l[3] / 2)))
+        #     r_left = int(math.sqrt(r_l[2]**2 + r_l[3]**2) * 0.8)
+        #     circle_l = cv2.circle(mask, center_l, r_left, (255, 255, 255), -1)
+        # if (len(hull_r) > 0):
+        #     r_r = cv2.boundingRect(hull_r[0])
+        #     center_r = ((r_r[0] + int(r_r[2] / 2), r_r[1] + int(r_r[3] / 2)))
+        #     r_right = int(math.sqrt(r_r[2]**2 + r_r[3]**2) * 0.8)
+        #     circle_r = cv2.circle(mask, center_r, r_right, (255, 255, 255), -1)
         eyeball_mask = cv2.bitwise_not(eyeball_mask)
         mask = cv2.bitwise_xor(mask, eyeball_mask)
         mask = cv2.bitwise_not(mask)
