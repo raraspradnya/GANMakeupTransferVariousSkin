@@ -5,15 +5,6 @@ data
 dataset
 experiment_BG/Transfer/
 experiment_BG/Transfer_1/
-groundtruth/coba/matching_0.png
-groundtruth/coba/matching_1.png
-groundtruth/coba/matching_2.png
-groundtruth/coba/matching_3.png
-groundtruth/coba/warping_0.png
-groundtruth/coba/warping_1.png
-groundtruth/coba/warping_2.png
-groundtruth/coba/warping_3.png
-groundtruth/coba/warping_0.png
 experiment_BG/Transfer_BG100/
 experiment_BG/Transfer_DRN150/
 experiment_BG/Transfer_BG137_fix/

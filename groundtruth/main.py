@@ -9,7 +9,7 @@ from skimage.exposure import match_histograms
 import copy
 
 from face_detection import select_face, select_all_faces
-from face_swap import face_swap
+from face_swap import face_swap, face_blend
 from face_parsing import get_face
 
 id_face = [1, 6, 11, 12, 13]
@@ -235,10 +235,10 @@ if __name__ == '__main__':
     seg_non_makeup = []
 
     # RYZEN
-    makeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/images/makeup/"
-    nonmakeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/images/non-makeup/"
-    seg_makeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/segs/makeup/"
-    seg_nonmakeup_directory = "D:/# Raras/GitHub/TA/dataset/RawData/segs/non-makeup/"
+    makeup_directory = "D:/#Raras/GitHub/TA/dataset/RawData/images/makeup/"
+    nonmakeup_directory = "D:/#Raras/GitHub/TA/dataset/RawData/images/non-makeup/"
+    seg_makeup_directory = "D:/#Raras/GitHub/TA/dataset/RawData/segs/makeup/"
+    seg_nonmakeup_directory = "D:/#Raras/GitHub/TA/dataset/RawData/segs/non-makeup/"
 
     # MAC
     # makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/images/makeup/"
@@ -247,21 +247,21 @@ if __name__ == '__main__':
     # seg_nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/non-makeup/"
 
     makeup.append(makeup_directory + "12.png")
-    makeup.append(makeup_directory + "94.png")
-    makeup.append(makeup_directory + "1635.png")
-    makeup.append(makeup_directory + "103.png")
+    makeup.append(makeup_directory + "vFG325.png")
+    makeup.append(makeup_directory + "12.png")
+    makeup.append(makeup_directory + "vFG325.png")
     seg_makeup.append(seg_makeup_directory + "12.png")
-    seg_makeup.append(seg_makeup_directory + "94.png")
-    seg_makeup.append(seg_makeup_directory + "1635.png")
-    seg_makeup.append(seg_makeup_directory + "103.png")
+    seg_makeup.append(seg_makeup_directory + "vFG325.png")
+    seg_makeup.append(seg_makeup_directory + "12.png")
+    seg_makeup.append(seg_makeup_directory + "vFG325.png")
 
-    non_makeup.append(nonmakeup_directory + "vSYYZ25.png")
-    non_makeup.append(nonmakeup_directory + "vSYYZ51.png")
-    non_makeup.append(nonmakeup_directory + "xfsy_0398.png")
     non_makeup.append(nonmakeup_directory + "vSYYZ663.png")
-    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ25.png")
-    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ51.png")
-    seg_non_makeup.append(seg_nonmakeup_directory + "xfsy_0398.png")
+    non_makeup.append(nonmakeup_directory + "xfsy_0478.png")
+    non_makeup.append(nonmakeup_directory + "xfsy_0478.png")
+    non_makeup.append(nonmakeup_directory + "vSYYZ663.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ663.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "xfsy_0478.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "xfsy_0478.png")
     seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ663.png")
 
     for i in range (len(makeup)):
@@ -299,20 +299,20 @@ if __name__ == '__main__':
             output = dst_img
             for k, dst_face in dst_faceBoxes.items():
                 # output = getMakeupGroundTruth_warping(src_face, dst_face["face"], dst_face["shape"], seg_dst_img, src_points, dst_face["points"], dst_img)
-                output = face_swap(src_face, dst_face["face"], src_points, dst_face["points"], dst_face["shape"], output, seg_dst_img)
+                output = face_blend(src_face, dst_face["face"], src_points, dst_face["points"], dst_face["shape"], output, seg_dst_img)
             output = cv2.resize(output, dim, interpolation = cv2.INTER_AREA)
             images = [src_img, dst_img, output]
             new_im = cv2.hconcat(images)
 
-            cv2.imshow("new image", new_im)
-            cv2.waitKey(0)
+            # cv2.imshow("new image", new_im)
+            # cv2.waitKey(0)
 
-            img_path = "D:/# Raras/GitHub/TA/groundtruth/coba/warping_{}.png".format(i)
+            img_path = "D:/#Raras/GitHub/TA/groundtruth/coba/warping_{}.png".format(i)
             print(img_path)
             cv2.imwrite(img_path, new_im)
 
         # HISTOGRAM MATCHING
-        img_path2 = "D:/# Raras/GitHub/TA/groundtruth/coba/matching_{}.png".format(i)
+        img_path2 = "D:/#Raras/GitHub/TA/groundtruth/coba/matching_{}.png".format(i)
         result = getMakeupGroundTruth_histogram(dst_img, seg_dst_img, src_img, seg_src_img)
 
         face_true = result[0]

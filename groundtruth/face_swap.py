@@ -342,12 +342,18 @@ def face_blend(src_face, dst_face, src_points, dst_points, dst_shape, dst_img, c
 
     ## 3d warp
     warped_src_face = warp_image_3d(src_face, src_points[:end], dst_points[:end], (h_face, w_face))
-    
+    # cv2.imshow("warped_src_face1", warped_src_face)
+    # warped_src_face_pil = Image.fromarray(warped_src_face)
+    # warped_src_face_pil = ImageEnhance.Contrast(warped_src_face_pil)
+    # warped_src_face_pil = warped_src_face_pil.enhance(1.5)
+    # warped_src_face = np.array(warped_src_face_pil)
+    # cv2.imshow("warped_src_face2", warped_src_face)
+    # cv2.waitKey(0)
+
     ## Mask for blending
     mask = mask_from_points((h_face, w_face), dst_points)
     mask_src = np.mean(warped_src_face, axis=2) > 0
     mask = np.asarray(mask * mask_src, dtype=np.uint8)
-    mask = ImageEnhance.Contrast(mask)
     
     ## Poisson Blending
     x, y, w, h = dst_shape
