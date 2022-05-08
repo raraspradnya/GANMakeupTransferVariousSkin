@@ -190,6 +190,11 @@ class Dataset(object):
             dataset1 = dataset1.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
             dataset2 = dataset2.repeat()
             dataset2 = dataset2.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
+        else:
+            dataset1 = dataset1.repeat(2)
+            dataset1 = dataset1.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
+            dataset2 = dataset2.repeat(1)
+            dataset2 = dataset2.shuffle(buffer_size = SHUFFLE_BUFFER_SIZE)
     
         # batch
         dataset1 = dataset1.batch(batch_size = self.batch_size)

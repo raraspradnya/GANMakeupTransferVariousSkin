@@ -4,8 +4,9 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 
 class FaceBeautyModel(object):
-    def __init__(self):
-        self.generator_model_path = "../export_models/BG137_FIX/Generator.h5"
+    def __init__(self, path):
+        # self.generator_model_path = "../export_models/BG150/Generator.h5"
+        self.generator_model_path = path
         self.Generator = self.loadGenerator()
         self.Generator.compile()
 
@@ -16,16 +17,13 @@ class FaceBeautyModel(object):
         return tf.keras.models.load_model(self.generator_model_path, custom_objects = {'InstanceNormalization':tfa.layers.InstanceNormalization})
 
     def transfer(self, images, makeup_images, predict_batch  = 10):
-        images = self.preprocessingImages(images)
-        makeup_images = self.preprocessingImages(makeup_images)
-
         transfer_images = self.Generator.predict([images, makeup_images], batch_size = predict_batch)
+        images = self.postprocessingImages(images)
+        makeup_images = self.postprocessingImages(makeup_images)
         transfer_images = self.postprocessingImages(transfer_images)
-        return transfer_images
+        return images, makeup_images, transfer_images
 
     def preprocessingImages(self, images):
-        for i in range(len(images)):
-            images[i] = cv2.resize(images[i], self.image_size)
         images = np.array(images, dtype = np.float32)
         images = (images / 255.0  - 0.5) * 2
         return images

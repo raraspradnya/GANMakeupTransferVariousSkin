@@ -62,10 +62,10 @@ def vis_parsing_maps(im, parsing_anno, stride, save_im=False, save_path='facepar
                    [0, 255, 255], [85, 255, 255], [170, 255, 255]]
 
     im = np.array(im)
-    parsing_anno = np.array(parsing_anno)
+    parsing_anno = np.array(parsing_anno).astype(np.uint8)
     
-    im = cv2.resize(im, (256, 256), interpolation = cv2.INTER_AREA)
-    parsing_anno= cv2.resize(parsing_anno, (256, 256), interpolation = cv2.INTER_AREA)
+    im = cv2.resize(im, (256, 256), interpolation = cv2.INTER_LINEAR)
+    parsing_anno= cv2.resize(parsing_anno, (256, 256), interpolation = cv2.INTER_NEAREST )
     print(im.shape, parsing_anno.shape)
 
     vis_im = im.copy().astype(np.uint8)
@@ -225,8 +225,6 @@ def create_mask(img):
         lst1 = np.unique(parsing)
         # print("Output list : ", lst1)
 
-        # vis_parsing_maps(image, parsing, stride=1, save_im=True, save_path="./test-img/coba.jpg")
-
         mask = np.zeros((parsing.shape[0], parsing.shape[1]), dtype=np.uint8).tolist()
         reorder_array = [0,1,2,3,4,5,1,11,12,11,6,8,7,9,13,13,0,10,0]
         for n in range (19):
@@ -235,29 +233,35 @@ def create_mask(img):
                     if (parsing[i][j] == n):
                         mask[i][j] = reorder_array[n]
         mask = np.array(mask)
+        # vis_parsing_maps(image, mask, stride=1, save_im=True, save_path="./test-img/coba.jpg")
         return mask
 
-# test_set = []
-# for (path, dirnames, filenames) in os.walk('D:/# Raras/src/data/edited/final'):
-#     test_set.extend(os.path.join(path, name) for name in filenames)
+test_set = []
+for (path, dirnames, filenames) in os.walk('C:/Users/RYZEN 9/Downloads/Archive (2)/makeup'):
+    test_set.extend(os.path.join(path, name) for name in filenames)
 
-# for instance in test_set:
-#     if (os.path.exists(instance.strip())):
-#         print("Parsing... ", instance)
-#         img_name= instance[32:]
-#         img_path = "D:/# Raras/src/makeup_dataset/final/makeup/scrape/" + str(img_name)[:-4] + ".png" 
-#         img = cv2.imread(instance)
+for instance in test_set:
+    if (os.path.exists(instance.strip())):
+        print("Parsing... ", instance)
+        img_name= instance[46:]
+        # img_path = "D:/# Raras/src/makeup_dataset/final/makeup/scrape/" + str(img_name)[:-4] + ".png" 
+        img = cv2.imread(instance)
+        im = cv2.resize(img, (256, 256), interpolation = cv2.INTER_LINEAR)
+        img_save_path = str(instance)[:-4] + ".png" 
+        cv2.imwrite(img_save_path, im)
 
-#         seg = create_mask(img)
-#         im = np.array(img)
-#         parsing_anno = np.array(seg)
-#         vis_im = im.copy().astype(np.uint8)
-#         vis_parsing_anno = parsing_anno.copy().astype(np.uint8)
-#         vis_parsing_anno = cv2.resize(vis_parsing_anno, None, fx=1, fy=1, interpolation=cv2.INTER_NEAREST)
-#         seg = Image.fromarray(vis_parsing_anno, 'L')
-#         seg_path = "D:/# Raras/src/makeup_dataset/final/makeup_segs/scrape/" + str(img_name)[:-4] + ".png" 
-#         seg.save(seg_path)
+        # seg = create_mask(img)
+        # im = np.array(img)
+        # parsing_anno = np.array(seg)
+        # vis_im = im.copy().astype(np.uint8)
+        # vis_parsing_anno = parsing_anno.copy().astype(np.uint8)
+        # vis_parsing_anno = cv2.resize(vis_parsing_anno, (256, 256), fx=1, fy=1, interpolation=cv2.INTER_NEAREST)
+        # seg = Image.fromarray(vis_parsing_anno, 'L')
+        # seg_path = 'C:/Users/RYZEN 9/Downloads/Archive (2)/makeup_segs/' + str(img_name)[:-4] + ".png" 
+        # seg.save(seg_path)
+        # cv2.imshow("segs", vis_parsing_anno)
+        # cv2.waitKey(0)
 
 
-#         img = Image.fromarray(img[:,:,::-1], 'RGB')
-#         img.save(img_path)
+        # img = Image.fromarray(img[:,:,::-1], 'RGB')
+        # img.save(img_path)

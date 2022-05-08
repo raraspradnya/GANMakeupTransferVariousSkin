@@ -1,10 +1,5 @@
-
 .DS_Store
 *.pyc
-data
 dataset
-experiment_BG/Transfer/
-experiment_BG/Transfer_1/
-experiment_BG/Transfer_BG100/
-experiment_BG/Transfer_DRN150/
-experiment_BG/Transfer_BG137_fix/
+benchmark
+result
