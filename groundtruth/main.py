@@ -246,20 +246,20 @@ if __name__ == '__main__':
     # seg_makeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/makeup/"
     # seg_nonmakeup_directory =  "/Users/raras/Documents/Raras/KULIAH/GITHUB/TA/dataset/RawData/segs/non-makeup/"
 
-    makeup.append(makeup_directory + "12.png")
-    makeup.append(makeup_directory + "vFG325.png")
-    makeup.append(makeup_directory + "12.png")
-    makeup.append(makeup_directory + "vFG325.png")
-    seg_makeup.append(seg_makeup_directory + "12.png")
+    makeup.append(makeup_directory + "0 (186).png") 
+    # makeup.append(makeup_directory + "vFG325.png")
+    # makeup.append(makeup_directory + "12.png")
+    # makeup.append(makeup_directory + "vFG325.png")
+    seg_makeup.append(seg_makeup_directory + "0 (186).png")
     seg_makeup.append(seg_makeup_directory + "vFG325.png")
     seg_makeup.append(seg_makeup_directory + "12.png")
     seg_makeup.append(seg_makeup_directory + "vFG325.png")
 
-    non_makeup.append(nonmakeup_directory + "vSYYZ663.png")
+    non_makeup.append(nonmakeup_directory + "00434.png")
     non_makeup.append(nonmakeup_directory + "xfsy_0478.png")
     non_makeup.append(nonmakeup_directory + "xfsy_0478.png")
     non_makeup.append(nonmakeup_directory + "vSYYZ663.png")
-    seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ663.png")
+    seg_non_makeup.append(seg_nonmakeup_directory + "00434.png")
     seg_non_makeup.append(seg_nonmakeup_directory + "xfsy_0478.png")
     seg_non_makeup.append(seg_nonmakeup_directory + "xfsy_0478.png")
     seg_non_makeup.append(seg_nonmakeup_directory + "vSYYZ663.png")
@@ -330,4 +330,3 @@ if __name__ == '__main__':
         new_im2 = cv2.hconcat(images2)
         cv2.imwrite(img_path2, new_im2)
         print(img_path2)
-

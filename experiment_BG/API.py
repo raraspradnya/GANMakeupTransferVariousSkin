@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
+import time
 
 class FaceBeautyModel(object):
     def __init__(self, path):
@@ -17,11 +18,18 @@ class FaceBeautyModel(object):
         return tf.keras.models.load_model(self.generator_model_path, custom_objects = {'InstanceNormalization':tfa.layers.InstanceNormalization})
 
     def transfer(self, images, makeup_images, predict_batch  = 10):
+        start_time = time.time()
+        
+        # khusus demo 
+        images = self.preprocessingImages(images)
+        makeup_images = self.preprocessingImages(makeup_images)
+
         transfer_images = self.Generator.predict([images, makeup_images], batch_size = predict_batch)
+        inference_time = round(time.time() - start_time, 3)
         images = self.postprocessingImages(images)
         makeup_images = self.postprocessingImages(makeup_images)
         transfer_images = self.postprocessingImages(transfer_images)
-        return images, makeup_images, transfer_images
+        return images, makeup_images, transfer_images, inference_time
 
     def preprocessingImages(self, images):
         images = np.array(images, dtype = np.float32)

@@ -79,7 +79,7 @@ class Model_DRN(object):
         perceptual_loss = perceptual_loss * gamma
 
         # Makeup loss
-        makeup_loss = Makeup_loss(y_true = [face_true, brow_true, eye_true, lip_true], y_pred_image = transfer_image, y_mask = [face_mask, brow_mask, eye_mask, lip_mask], classes = self.classes)
+        makeup_loss, predicted = Makeup_loss(y_true = [face_true, brow_true, eye_true, lip_true], y_pred_image = transfer_image, y_mask = [face_mask, brow_mask, eye_mask, lip_mask], classes = self.classes)
         makeup_loss = makeup_loss * 10
 
         # Background loss
@@ -110,22 +110,28 @@ class Model_DRN(object):
         x = Concatenate_layer(source, reference, axis = 3)
 
         # DOWNSAMPLING
-        x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3))
-        x = ReLU_layer(x)
-        x = Dropout_layer(x, rate=0.2)
-        x = Conv2D_layer(x, filters = 128, kernel_size = (3, 3))
+        x_in = x
+        x_out = Conv2D_layer(x_in, filters = 128, kernel_size = (3, 3))
+        x_out = ReLU_layer(x_out)
+        x_out = Dropout_layer(x_out, rate=0.2)
+        x_out = Conv2D_layer(x_out, filters = 128, kernel_size = (3, 3))
+        x = tf.keras.layers.Add()([x_in, x_out])
 
         # DILATED RESIDUAL BLOCK - 1 
-        x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 2)
-        x = ReLU_layer(x)
-        x = Dropout_layer(x, rate=0.2)
-        x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 2)
+        x_in1 = x
+        x_out1 = Dilated_layer(x_in1, filters = 128, kernel_size = (3, 3), dilation = 2)
+        x_out1 = ReLU_layer(x_out1)
+        x_out1 = Dropout_layer(x_out1, rate=0.2)
+        x_out1 = Dilated_layer(x_out1, filters = 128, kernel_size = (3, 3), dilation = 2)
+        x = tf.keras.layers.Add()([x_in1, x_out1])
 
         # DILATED RESIDUAL BLOCK - 2
-        x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 4)
-        x = ReLU_layer(x)
-        x = Dropout_layer(x, rate=0.2)
-        x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 4)
+        x_in2 = x
+        x_out2 = Dilated_layer(x_in2, filters = 128, kernel_size = (3, 3), dilation = 4)
+        x_out2 = ReLU_layer(x_out2)
+        x_out2 = Dropout_layer(x_out2, rate=0.2)
+        x_out2 = Dilated_layer(x_out2, filters = 128, kernel_size = (3, 3), dilation = 4)
+        x = tf.keras.layers.Add()([x_in2, x_out2])
 
         # DILATED RESIDUAL BLOCK - 3
         x = Dilated_layer(x, filters = 128, kernel_size = (3, 3), dilation = 2)
@@ -265,7 +271,7 @@ class Model_DRN(object):
                 if(step % 200 == 0):
                     save_images(epoch_num, step, self.batch_size, [batch_features["images1"].numpy(), transfer_image[0].numpy(), batch_labels["whole_face_true"].numpy(), batch_features["images2"].numpy(), transfer_image[1].numpy()], self.pic_save_path)
                     save_images(epoch_num, step, self.batch_size, [batch_features["images1"].numpy(), bg_images[1].numpy()],  self.bg_save_path)
-                    save_images(epoch_num, step, self.batch_size, [batch_labels["face_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy()], self.gt_save_path)
+                    save_images(epoch_num, step, self.batch_size, [batch_labels["face_true"].numpy(), batch_labels["brow_true"].numpy(), batch_labels["lip_true"].numpy(), batch_labels["eye_true"].numpy()], self.gt_save_path)
                 if(step == train_step):
                     break
             model_path = os.path.join(self.model_path, "{epoch:04d}.ckpt".format(epoch = epoch_num))

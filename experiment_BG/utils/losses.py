@@ -40,7 +40,9 @@ def Makeup_loss(y_true, y_pred_image, y_mask, classes):
 
     y_pred_lip = y_pred_image * lip_mask
     lip_loss = tf.reduce_mean((y_true_lip - y_pred_lip) ** 2) * 20
-    return (face_loss + brow_loss + eye_loss + lip_loss)
+
+    predicted = [y_pred_face, y_pred_brow, y_pred_eye, y_pred_lip]
+    return (face_loss + brow_loss + eye_loss + lip_loss), predicted
 
 @tf.function
 def Total_Variation_loss(feature):

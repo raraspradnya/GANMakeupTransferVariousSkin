@@ -9,9 +9,9 @@ from skimage.metrics import structural_similarity as ssim
 from API import FaceBeautyModel
 from utils.dataset import Dataset
 
-output_path = "Transfer_final"
-images_path = "..\\dataset\\RawData\\images\\non-makeup\\*"
-reference_image_path = "..\\dataset\\RawData\\images\\makeup\\*"
+output_path = "..\\result\\demo results"
+images_path = "..\\benchmark\\Referensi\\no_makeup\\*" 
+reference_image_path = "..\\benchmark\\Referensi\\makeup\\*"
 
 
 params = {
@@ -47,17 +47,21 @@ def images_demo(face_beauty_model, source_image, reference_image):
     demakeup_images = []
     images = []
     makeup_images = []
+    inference_time= []
 
     for i in range(len(source_image)):
-        image, makeup_image, results = face_beauty_model.transfer(source_image[i], reference_image[i])
-        transfer_image = results[0]
-        demakeup_image = results[1]
-        transfer_images.append(transfer_image)
-        demakeup_images.append(demakeup_image)
-        images.append(image)
-        makeup_images.append(makeup_image)
+        for j in range(len(reference_image)):
 
-    return images, makeup_images, transfer_images, demakeup_images
+            image, makeup_image, results, time = face_beauty_model.transfer(np.array([source_image[i]]), np.array([reference_image[j]]))
+            transfer_image = results[0]
+            demakeup_image = results[1]
+            transfer_images.append(transfer_image)
+            demakeup_images.append(demakeup_image)
+            images.append(image)
+            makeup_images.append(makeup_image)
+            inference_time.append(time)
+
+    return images, makeup_images, transfer_images, demakeup_images, inference_time
 
 def getData(dataset):
     source_images = []
@@ -71,17 +75,25 @@ def getData(dataset):
 
 if __name__ == "__main__":
     face_beauty_model_BG = FaceBeautyModel("../export_models/BG150/Generator.h5")
-    face_beauty_model_DRN = FaceBeautyModel("../export_models/DRN370/Generator.h5")
+    face_beauty_model_DRN = FaceBeautyModel("../export_models/DRN150/Generator.h5")
 
     # create output dir
     shutil.rmtree(output_path, ignore_errors=True)
     os.makedirs(output_path, exist_ok = True)
-    test_dataset = Dataset(params['test_dataset_path'], image_shape = params['image_shape'], classes = params['classes'], batch_size = params['batch_size'], dataset_size = params['test_dataset_size'], isTraining = False)
-    dataset = test_dataset.flow()
-    source_image, reference_image = getData(dataset)
+    images_data_path = glob.glob(images_path, recursive=True)
+    images_makeup_path = glob.glob(reference_image_path, recursive=True)
+    source_image = []
+    reference_image = []
+    for i in range(len(images_data_path)):
+        image = cv2.imread(images_data_path[i])
+        makeup_image = cv2.imread(images_makeup_path[i])
+        image = cv2.resize(image, (256, 256))
+        makeup_image = cv2.resize(makeup_image, (256, 256))
+        source_image.append(image)
+        reference_image.append(makeup_image)
 
-    image, makeup_image, transfer_images_BG, demakeup_images_BG = images_demo(face_beauty_model_BG, source_image, reference_image)
-    image, makeup_image, transfer_images_DRN, demakeup_images_DRN = images_demo(face_beauty_model_DRN, source_image, reference_image)
+    image, makeup_image, transfer_images_BG, demakeup_images_BG, inference_time_BG = images_demo(face_beauty_model_BG, source_image, reference_image)
+    image, makeup_image, transfer_images_DRN, demakeup_images_DRN, inference_time_DRN = images_demo(face_beauty_model_DRN, source_image, reference_image)
 
     # save images
     ssim_results_bg = []
@@ -94,11 +106,11 @@ if __name__ == "__main__":
         # cv2.imshow("transfer_images", transfer_images[i][0])
         # cv2.imshow("demakeup_images", demakeup_images[i][0])
         # cv2.waitKey(0)
-        raw = cv2.hconcat([image[i][0], makeup_image[i][0]])
-        bg = cv2.hconcat([transfer_images_BG[i][0], demakeup_images_BG[i][0]])
-        drn = cv2.hconcat([transfer_images_DRN[i][0], demakeup_images_DRN[i][0]])
-        imres = cv2.vconcat([raw, bg, drn])
-        cv2.imwrite(path, imres)
+        raw = cv2.hconcat([image[i][0], makeup_image[i][0], transfer_images_BG[i][0], transfer_images_DRN[i][0]])
+        # bg = cv2.hconcat([transfer_images_BG[i][0], demakeup_images_BG[i][0]])
+        # drn = cv2.hconcat([transfer_images_DRN[i][0], demakeup_images_DRN[i][0]])
+        # imres = cv2.vconcat([raw, bg, drn])
+        cv2.imwrite(path, raw)
 
         no_makeup = cv2.cvtColor(image[i][0], cv2.COLOR_BGR2GRAY)
         transfer_bg = cv2.cvtColor(transfer_images_BG[i][0], cv2.COLOR_BGR2GRAY)
@@ -111,5 +123,8 @@ if __name__ == "__main__":
 # index = np.arange(0, len(transfer_images))
 print(ssim_results_bg)
 print(ssim_results_drn)
-ssim_results_np = np.asarray([[ssim_results_bg], [ssim_results_drn]]).reshape(-1)
-pd.DataFrame(ssim_results_np).to_csv('ssim.csv')
+print(inference_time_BG)
+print(inference_time_DRN)
+res = np.stack((ssim_results_bg, ssim_results_drn, inference_time_BG, inference_time_DRN), axis=1)
+data = pd.DataFrame(res, columns=["SSIM ResNet", "SSIM Dilated ResNet", "Inference Time ResNet", "Inference Time Dilated ResNet"])
+data.reset_index().to_csv(output_path +'\\ssim.csv', index=False, header=True, decimal=',', sep=' ', float_format='%.3f')
