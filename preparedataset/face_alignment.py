@@ -10,7 +10,6 @@ from PIL import Image
 import mediapipe as mp
 from groundtruth.face_parsing import vis_parsing_maps
 
-# https://github.com/serengil/tensorflow-101/blob/master/python/face-alignment.py
 def euclidean_distance(a, b):
     x1 = a[0]; y1 = a[1]
     x2 = b[0]; y2 = b[1]
@@ -276,9 +275,8 @@ def estimate_pose(img_path):
 
 #------------------------
 
-# test_set = ["D:/# Raras/src/data/coba\\1003.jpg"]
 test_set = []
-for (path, dirnames, filenames) in os.walk('D:/# Raras/src/makeup_dataset/all/images/makeup'):
+for (path, dirnames, filenames) in os.walk('insert_directory_here'):
     test_set.extend(os.path.join(path, name) for name in filenames)
 
 for instance in test_set:
@@ -289,43 +287,18 @@ for instance in test_set:
         print(pose)
 
         if (pose == "Forward"):
-            # try:
-            #     alignedFace, check = alignFace(instance)
-            #     if (check == 1):
-            #         plt.imshow(alignedFace[:, :, ::-1])
-            #         # plt.show()
-            #         try:
-            #             img, gray_img, checka = detectFace(alignedFace, 0.75)
-            #         except:
-            #             print(img_name + " is error")
-
-            #         img = expand2square(img[:, :, ::-1], (0,0,0))
-                    
-            # plt.show()
             img = cv2.imread(instance)
-            img_path = "D:/# Raras/src/makeup_dataset/final2/makeup/" + str(img_name)
+            img_path = "insert_makeup_directory_here" + str(img_name)
             img.save(img_path)
-            seg_path = 'D:/# Raras/src/makeup_dataset/all/segs/makeup/' + str(img_name)
+
+            seg_path = 'insert_segment_directory_here' + str(img_name)
             seg = cv2.imread(seg_path)
             seg_gray = cv2.cvtColor(seg, cv2.COLOR_BGR2GRAY)
             seg_img = Image.fromarray(seg_gray, 'L')
-            vis_parsing_maps(img, seg_img, stride=1, save_im=True, save_path='C:/Users/RYZEN 9/Documents/GitHub/TA/faceparsing/res/test_res/seg1.jpg')
-            seg_path_save = "D:/# Raras/src/makeup_dataset/final/makeup_segs/" + str(img_name)
+            vis_parsing_maps(img, seg_img, stride=1, save_im=True, save_path='insert_directory_here')
+            seg_path_save = "insert_directory_here" + str(img_name)
             seg_img.save(seg_path_save)
-            cv2.imshow("img", img)
-            cv2.waitKey(0)
-                # else:
-                #     print("No face Detectedd")
-            # except:
-            #     img = Image.open(instance)
-            #     img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
-            #     img.save(img_path)
-            #     # print("gagal 1")
         else:
-            # img = Image.open(instance)
-            # img_path = "D:/# Raras/src/makeup_dataset/all/images/error/no_makeup/" + str(img_name)
-            # img.save(img_path)
-            # print("gagal 2")
             pass
     else:
         print("file not found")
