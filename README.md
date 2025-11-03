@@ -2,7 +2,10 @@
 
 
 ## Introduction
-Facial makeup transfer system is capable of transferring makeup styles from a reference face image to another face that has not used makeup. Unfortunately, some applications of the makeup transfer system that have now been published can only be used optimally for fair-skinned faces. Thus, this research addresses this issue by developing a facial makeup transfer system that can be use by users with various skin colors, using one of the latest deep learning applications, namely generative adversarial network (GAN). 
+Facial makeup transfer system is capable of transferring makeup styles from a reference face image to another face that has not used makeup. Unfortunately, some applications of the makeup transfer system that have now been published can only be used optimally for fair-skinned faces. Thus, this research addresses this issue by developing a facial makeup transfer system that can be use by users with various skin colors, using one of the latest deep learning applications, namely generative adversarial network (GAN).
+
+➡️ [Read the full journal here](https://bit.ly/GANMakeupTransferVariousSkin)
+
 
 ![Model Framework](images/Framework.png)
 _Model Framework_
@@ -28,7 +31,7 @@ _Ground Truth Making_
 2. Modify the directories for original images, reference images, and resulting images in `demo.py`.
 3. Run `python demo.py`, you will find the transfer result according the directory that you desired.
 
-## Coding References
+## References
 1. Data Pre-processing
 - [Scrape images from Pinterest](https://github.com/civiliangame/PinterestScraper)
 - [Face Alignment](https://github.com/serengil/tensorflow-101/blob/master/python/face-alignment.py)
